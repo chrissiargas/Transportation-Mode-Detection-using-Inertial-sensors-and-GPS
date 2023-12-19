@@ -1,0 +1,133 @@
+extract_args:
+  path: Datasets
+  dataset: SHL-preview
+  signals:
+  - Acc
+  - Gyr
+  - Mag
+resample_args:
+  old_motion_fs: 100 #Hz
+  new_motion_fs: 20
+  old_location_T: 1 #s
+  new_location_T: 60
+  max_distance: 2 #s
+  sampling_method: nearest #nearest, linear
+
+modify_args:
+  loc_filter:
+  loc_filter_window:
+  loc_rescaler:
+  loc_virtual_features:
+  - velocity
+  - acceleration
+  mot_smoother: moving_average
+  mot_smoother_window: 5
+  mot_filter:
+  mot_filter_window: 0
+  mot_rescaler:
+  mot_virtual_signals:
+  - acc_normXYZ
+  - acc_jerkX
+  - acc_jerkY
+  - acc_jerkZ
+  - mag_jerkX
+  - mag_jerkY
+  - mag_jerkZ
+  - gyr_normXYZ
+segment_args:
+  loc_length: 12 # samples
+  loc_stride: 1
+
+  mot_length: 1200
+  mot_stride: 1200
+
+  mot_bag_size: 1
+  mot_bag_step: 0
+
+build_args:
+  GPS_position: Hand
+  inertial_positions:
+  - Hand
+  - Torso
+  - Bag
+  - Hips
+  diff_threshold: 60 #s
+
+  train_test_split: loso
+  train_test_hold_out: 1
+
+  train_val_split: lopo_stratified
+  train_val_hold_out: 0.1
+
+  test_bag_position: same
+  test_oversampling: true
+  train_bag_position: same
+  train_oversampling: true
+  val_bag_position: same
+  val_oversampling: true
+
+  motion_features:
+  - acc_normXYZ
+  - acc_jerkX
+  - acc_jerkY
+  - acc_jerkZ
+  - mag_jerkX
+  - mag_jerkY
+  - mag_jerkZ
+  - Gyr_x
+  - Gyr_y
+  - Gyr_z
+  - gyr_normXYZ
+  in_bags: false
+
+  motion_form: temporal
+  combine_sensors: separate # concat, separate
+  motion_augmentations: # ['Jittering','Permutation','TimeWarp','Rotation']
+  separated_channels:
+  - - acc_jerkX
+    - acc_jerkY
+    - acc_jerkZ
+  - - acc_normXYZ
+  - - mag_jerkX
+    - mag_jerkY
+    - mag_jerkZ
+  - - Gyr_x
+    - Gyr_y
+    - Gyr_z
+  - - gyr_normXYZ
+  f_interpolation: log # log, linear
+  log_power: true
+  spectro_window: 10 # seconds
+  spectro_overlap: 9
+  spectro_augmentations:
+  - freq_mask
+  - time_mask
+  location_augmentation: true
+  get_position: false
+
+  time_features:
+  - velocity
+  - acceleration
+  window_features:
+  - Movability
+  - Mean
+  - Std
+  batch_size: 50
+  random: true
+
+train_args:
+  L: 256
+  D: 256
+
+  epochs: 80
+  motion_epochs: 80
+  location_epochs: 200
+
+  learning_rate: 0.0001
+
+  motion_transfer: train
+  location_transfer: skip
+
+  motorized: false
+  exclude_modes:
+  - undefined
