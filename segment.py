@@ -39,7 +39,7 @@ class Segmenter:
         if not os.path.exists(self.segmented_path):
             os.makedirs(self.segmented_path)
 
-        with open('info/modified_features.pickle', 'rb') as handle:
+        with open('info/' + self.conf.dataset + '/modified_features.pickle', 'rb') as handle:
             features = pickle.load(handle)
             self.mot_features = features['mot_features']
             self.loc_features = features['loc_features']
@@ -56,7 +56,7 @@ class Segmenter:
             'mot_features': self.mot_features,
             'loc_features': self.loc_features,
         }
-        with open('info/segmented_features.pickle', 'wb') as handle:
+        with open('info/' + self.conf.dataset + '/segmented_features.pickle', 'wb') as handle:
             pickle.dump(features, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     def show_sizes(self):
@@ -79,8 +79,8 @@ class Segmenter:
         load = os.path.exists(self.segmented_path) and load
 
         n_exists = False
-        if load and os.path.exists('info/segmented_sizes.pickle'):
-            with open('info/segmented_sizes.pickle', 'rb') as handle:
+        if load and os.path.exists('info/' + self.conf.dataset + '/segmented_sizes.pickle'):
+            with open('info/' + self.conf.dataset + '/segmented_sizes.pickle', 'rb') as handle:
                 sizes = pickle.load(handle)
                 self.n_mot = sizes['n_mot']
                 self.n_loc = sizes['n_loc']
@@ -94,7 +94,7 @@ class Segmenter:
                 'n_mot': self.n_mot,
                 'n_loc': self.n_loc,
             }
-            with open('info/segmented_sizes.pickle', 'wb') as handle:
+            with open('info/' + self.conf.dataset + '/segmented_sizes.pickle', 'wb') as handle:
                 pickle.dump(sizes, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         return motion, mot_info, location, loc_info

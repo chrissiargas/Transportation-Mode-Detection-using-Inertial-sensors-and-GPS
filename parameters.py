@@ -1,9 +1,4 @@
 TMD_MIL_parameters = {
-    'extract_args': {
-        'path': 'Datasets',
-        'dataset': 'SHL-preview',
-        'signals': ['Acc', 'Gyr', 'Mag']
-    },
     'resample_args': {
         'old_motion_fs': 100,
         'new_motion_fs': 10,
@@ -35,13 +30,6 @@ TMD_MIL_parameters = {
         'mot_bag_step': 600
     },
     'build_args': {
-        'GPS_position': 'Hand',
-        'inertial_positions': ['Hand', 'Torso', 'Bag', 'Hips'],
-        'diff_threshold': 60,
-        'train_test_split': 'loso',
-        'train_test_hold_out': 3,
-        'train_val_split': 'lopo_stratified',
-        'train_val_hold_out': 0.15,
         'test_bag_position': 'same',
         'test_oversampling': True,
         'train_bag_position': 'same',
@@ -80,11 +68,6 @@ TMD_MIL_parameters = {
 }
 
 Liang_parameters = {
-    'extract_args': {
-        'path': 'Datasets',
-        'dataset': 'SHL-preview',
-        'signals': ['Acc', 'Gyr', 'Mag']
-    },
     'resample_args': {
         'old_motion_fs': 100,
         'new_motion_fs': 50
@@ -105,11 +88,6 @@ Liang_parameters = {
         'mot_bag_step': 0
     },
     'build_args': {
-        'inertial_positions': ['Hand', 'Torso', 'Bag', 'Hips'],
-        'train_test_split': 'loso',
-        'train_test_hold_out': 3,
-        'train_val_split': 'lopo_stratified',
-        'train_val_hold_out': 0.15,
         'test_bag_position': 'same',
         'test_oversampling': True,
         'train_bag_position': 'same',
@@ -133,11 +111,6 @@ Liang_parameters = {
 }
 
 Tang_parameters = {
-    'extract_args': {
-        'path': 'Datasets',
-        'dataset': 'SHL-preview',
-        'signals': ['Acc', 'Gyr', 'Mag']
-    },
     'resample_args': {
         'old_motion_fs': 100,
         'new_motion_fs': 20
@@ -160,11 +133,6 @@ Tang_parameters = {
         'mot_bag_step': 0
     },
     'build_args': {
-        'inertial_positions': ['Hand', 'Torso', 'Bag', 'Hips'],
-        'train_test_split': 'loso',
-        'train_test_hold_out': 3,
-        'train_val_split': 'lopo_stratified',
-        'train_val_hold_out': 0.1,
         'test_bag_position': 'same',
         'test_oversampling': True,
         'train_bag_position': 'same',

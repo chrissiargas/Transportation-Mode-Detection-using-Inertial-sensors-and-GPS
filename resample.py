@@ -62,8 +62,8 @@ class Resampler:
         load = os.path.exists(self.resampled_path) and load
 
         n_exists = False
-        if load and os.path.exists('info/resampled_sizes.pickle'):
-            with open('info/resampled_sizes.pickle', 'rb') as handle:
+        if load and os.path.exists('info/' + self.conf.dataset + '/resampled_sizes.pickle'):
+            with open('info/' + self.conf.dataset + '/resampled_sizes.pickle', 'rb') as handle:
                 sizes = pickle.load(handle)
                 self.n_mot = sizes['n_mot']
                 self.n_loc = sizes['n_loc']
@@ -79,7 +79,7 @@ class Resampler:
                 'n_loc': self.n_loc,
                 'n_lbs': self.n_lbs,
             }
-            with open('info/resampled_sizes.pickle', 'wb') as handle:
+            with open('info/' + self.conf.dataset + '/resampled_sizes.pickle', 'wb') as handle:
                 pickle.dump(sizes, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         return motion, location, labels

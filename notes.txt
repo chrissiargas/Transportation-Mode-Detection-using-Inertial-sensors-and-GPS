@@ -1,0 +1,18 @@
+# print(np.unique(self.motion_info[self.train_indices, 2]))
+# print(np.unique(self.motion_info[self.val_indices, 2]))
+# print(np.unique(self.motion_info[self.test_indices, 2]))
+#
+# print(self.train_size)
+# print(self.val_size)
+# print(self.test_size)
+#
+# train_modes = Counter(self.motion_info[self.train_indices, -1])
+# val_modes = Counter(self.motion_info[self.val_indices, -1])
+# test_modes = Counter(self.motion_info[self.test_indices, -1])
+#
+# plt.bar(list(train_modes.keys()), list(train_modes.values()))
+# plt.show()
+# plt.bar(list(val_modes.keys()), list(val_modes.values()))
+# plt.show()
+# plt.bar(list(test_modes.keys()), list(test_modes.values()))
+# plt.show()

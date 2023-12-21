@@ -1,6 +1,6 @@
 extract_args:
   path: Datasets
-  dataset: SHL-preview
+  dataset: SHL-complete #SHL-preview or SHL-complete
   signals:
   - Acc
   - Gyr
@@ -45,7 +45,7 @@ segment_args:
   mot_bag_step: 0
 
 build_args:
-  GPS_position: Hand
+  GPS_position: Hips
   inertial_positions:
   - Hand
   - Torso
@@ -53,11 +53,11 @@ build_args:
   - Hips
   diff_threshold: 60 #s
 
-  train_test_split: loso
-  train_test_hold_out: 1
+  train_test_split: ldo_start  # loso, ldo_start, ldo_end, ldo_random
+  train_test_hold_out: 20
 
-  train_val_split: lopo_stratified
-  train_val_hold_out: 0.1
+  train_val_split: ldo_start # lopo_stratified, ldo_start, ldo_end, ldo_random
+  train_val_hold_out: 5
 
   test_bag_position: same
   test_oversampling: true
@@ -131,3 +131,5 @@ train_args:
   motorized: false
   exclude_modes:
   - undefined
+postprocess_args:
+  seq_threshold: 70 #s

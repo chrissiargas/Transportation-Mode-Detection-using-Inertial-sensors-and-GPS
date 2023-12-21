@@ -11,7 +11,7 @@ from config_parser import Parser
 
 
 def get_temporal_encoder(input_shapes):
-    initializer = initializers.he_uniform()
+    initializer = initializers.he_uniform
     regularizer = regularizers.l2(0.001)
 
     channel_inputs = []
@@ -31,7 +31,7 @@ def get_temporal_encoder(input_shapes):
                 kernel_size=kernel_size[k],
                 strides=1,
                 padding='same',
-                kernel_initializer=initializer,
+                kernel_initializer=initializer(),
                 name='channel_'+str(channel+1)+'->motion_conv_' + str(layer))
             activation = ReLU(name='channel_'+str(channel+1)+'->ReLU_' + str(layer))
             pooling = MaxPooling1D(4, strides=2, padding='same',
@@ -60,7 +60,7 @@ def get_temporal_encoder(input_shapes):
     encoding = flatten(encoding)
 
     dense = Dense(units=128,
-                  kernel_initializer=initializer,
+                  kernel_initializer=initializer(),
                   name='motion_dense',
                   kernel_regularizer=regularizer)
     activation = ReLU()

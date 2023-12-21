@@ -9,9 +9,10 @@ from config_parser import Parser
 from Tang_utils import get_motion_model
 from metrics import Metrics
 from typing import Tuple
+from evaluate import evaluate
 
 
-def train(data: Builder, summary=True, verbose=True, load=False, path=None, scores=False) ->\
+def train(data: Builder, summary=True, verbose=True, load=False, path=None, eval=False, use_HMM=False) ->\
         Tuple[Builder, str, float, float, float]:
     conf = Parser()
     conf.get_args()
@@ -31,14 +32,16 @@ def train(data: Builder, summary=True, verbose=True, load=False, path=None, scor
     if not os.path.exists(log_path):
         os.makedirs(log_path)
     try:
-        shutil.rmtree(log_path)
+        if not load:
+            shutil.rmtree(log_path)
     except OSError as e:
         print("Error: %s - %s." % (e.filename, e.strerror))
 
     if not os.path.isdir(model_dir):
         os.makedirs(model_dir)
     try:
-        os.remove(model_path)
+        if not load:
+            os.remove(model_path)
     except OSError as e:
         print("Error: %s - %s." % (e.filename, e.strerror))
 
@@ -52,7 +55,7 @@ def train(data: Builder, summary=True, verbose=True, load=False, path=None, scor
         print('__________________________________________________________________________________________________')
         print(model.get_layer('classifier').summary())
 
-    optimizer = Adam(lr=float(conf.learning_rate))
+    optimizer = Adam(learning_rate=float(conf.learning_rate))
     loss_function = MeanSquaredError()
 
     model.compile(optimizer=optimizer,
@@ -62,62 +65,81 @@ def train(data: Builder, summary=True, verbose=True, load=False, path=None, scor
     if load:
         if not os.path.isdir(model_dir):
             return None
+        print(model_path)
+        model.load_weights(model_path)
 
-        model.load_weights(model_dir)
-
-    val_steps = data.val_size // conf.batch_size
-    train_steps = data.train_size // conf.batch_size
-    test_steps = data.test_size // conf.batch_size
-
-    tensorboard_callback = TensorBoard(log_path, histogram_freq=1)
-
-    save_model = ModelCheckpoint(
-        filepath=model_path,
-        monitor='val_loss',
-        verbose=verbose,
-        save_best_only=True,
-        mode='min',
-        save_weights_only=True)
-
-    early_stopping = EarlyStopping(
-        monitor='val_loss',
-        min_delta=0,
-        patience=5,
-        mode='min',
-        verbose=verbose)
-
-    val_metrics = Metrics(val, val_steps, 'val', verbose)
-
-    callbacks = [
-        tensorboard_callback,
-        save_model,
-        early_stopping
-    ]
-
-    history = model.fit(
-        train,
-        epochs=conf.epochs,
-        steps_per_epoch=train_steps,
-        validation_data=val,
-        validation_steps=val_steps,
-        callbacks=callbacks,
-        use_multiprocessing=True,
-        verbose=verbose
-    )
-
-    model.load_weights(model_path)
-
-    test_metrics = Metrics(test, test_steps, 'test', verbose)
-    model.evaluate(test, steps=test_steps, callbacks=[test_metrics])
-
-    if scores:
-        pass
     else:
-        accuracy, f1_score, conf = 1., 1., 1.
+        val_steps = data.val_size // conf.batch_size
+        train_steps = data.train_size // conf.batch_size
+
+        tensorboard_callback = TensorBoard(log_path, histogram_freq=1)
+
+        save_model = ModelCheckpoint(
+            filepath=model_path,
+            monitor='val_loss',
+            verbose=verbose,
+            save_best_only=True,
+            mode='min',
+            save_weights_only=True)
+
+        early_stopping = EarlyStopping(
+            monitor='val_loss',
+            min_delta=0,
+            patience=5,
+            mode='min',
+            verbose=verbose)
+
+        # val_metrics = Metrics(val, val_steps, 'val', verbose)
+
+        callbacks = [
+            tensorboard_callback,
+            save_model,
+            early_stopping
+        ]
+
+        history = model.fit(
+            train,
+            epochs=conf.epochs,
+            steps_per_epoch=train_steps,
+            validation_data=val,
+            validation_steps=val_steps,
+            callbacks=callbacks,
+            use_multiprocessing=True,
+            verbose=verbose
+        )
+
+        model.load_weights(model_path)
+
+    test_steps = data.test_size // conf.batch_size
+    # test_metrics = Metrics(test, test_steps, 'test', verbose)
+    # model.evaluate(test, steps=test_steps, callbacks=[test_metrics])
+
+    if eval:
+        accuracy, f1, post_accuracy, post_f1, cm_df = evaluate(data, model, use_HMM)
+
+    else:
+        accuracy, f1, post_accuracy, post_f1, cm_df = 0., 0., 0., 0., 0.
+
+    scores = [accuracy, f1, post_accuracy, post_f1, cm_df]
 
     del train
     del val
     del test
 
-    return data, model_path, accuracy, f1_score, conf
+    return data, model_path, scores
 
+
+from parameters import Tang_parameters
+from config_parser import config_edit
+import ruamel.yaml
+
+if __name__ == '__main__':
+    archive = os.path.join('archive', 'Tang', "save-" + '20231221-153032')
+
+    test_user = 2
+
+    path = os.path.join(archive, "test_user_" + str(test_user))
+    config_edit('build_args', 'train_test_hold_out', test_user)
+
+    data = Builder()
+    history = train(data, summary=False, verbose=True, load=True, path=path, eval=True, use_HMM=True)

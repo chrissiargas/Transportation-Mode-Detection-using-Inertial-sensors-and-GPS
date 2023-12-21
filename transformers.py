@@ -40,7 +40,7 @@ class temporal_transformer:
         config.get_args()
         self.conf = config
 
-        with open('info/segmented_features.pickle', 'rb') as handle:
+        with open('info/' + self.conf.dataset + '/segmented_features.pickle', 'rb') as handle:
             features = pickle.load(handle)
             self.mot_features = features['mot_features']
 
@@ -143,7 +143,7 @@ class spectro_transformer:
         config.get_args()
         self.conf = config
 
-        with open('info/segmented_features.pickle', 'rb') as handle:
+        with open('info/' + self.conf.dataset + '/segmented_features.pickle', 'rb') as handle:
             features = pickle.load(handle)
             self.mot_features = features['mot_features']
 
@@ -287,7 +287,7 @@ class series_transformer:
         config.get_args()
         self.conf = config
 
-        with open('info/segmented_features.pickle', 'rb') as handle:
+        with open('info/' + self.conf.dataset + '/segmented_features.pickle', 'rb') as handle:
             features = pickle.load(handle)
             self.time_features = features['loc_features']
 

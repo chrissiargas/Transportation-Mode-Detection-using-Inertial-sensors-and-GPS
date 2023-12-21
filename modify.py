@@ -20,7 +20,7 @@ class Modifier:
 
         self.from_path = os.path.join(os.path.expanduser('~'), self.conf.path, self.conf.dataset + '-resampled')
 
-        self.resampler = Resampler(delete_src=False, delete_dst=delete_src)
+        self.resampler = Resampler(delete_src=delete_src, delete_dst=delete_src)
         src_exists = len(os.listdir(self.from_path)) > 0
         self.motion, self.location, self.labels = self.resampler(load=src_exists, verbose=not src_exists)
 
@@ -42,7 +42,7 @@ class Modifier:
         self.avail_mot_sensors = ['acc', 'gyr', 'mag']
         self.avail_mot_features = ['normXYZ', 'jerk', 'jerkX', 'jerkY', 'jerkZ']
 
-        with open('info/initial_features.pickle', 'rb') as handle:
+        with open('info/' + self.conf.dataset + '/initial_features.pickle', 'rb') as handle:
             features = pickle.load(handle)
             self.mot_features = features['mot_features']
             self.loc_features = features['loc_features']
@@ -78,7 +78,7 @@ class Modifier:
             'loc_features': self.loc_features,
             'lbs_features': self.lbs_features,
         }
-        with open('info/modified_features.pickle', 'wb') as handle:
+        with open('info/' + self.conf.dataset + '/modified_features.pickle', 'wb') as handle:
             pickle.dump(features, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     def show_sizes(self):

@@ -13,7 +13,7 @@ import Liang_training
 import Tang_training
 
 REGENERATE = False
-
+SPLIT = 'ldo'
 
 def reset_tensorflow_keras_backend():
     import tensorflow as tf
@@ -105,13 +105,26 @@ def Tang(archive_path):
 
     repeats = 1
     regenerate = REGENERATE
-    for _ in range(repeats):
-        for test_user in [1, 2, 3]:
-            print('TEST USER: ' + str(test_user))
-            path = os.path.join(archive, "test_user_" + str(test_user))
-            config_edit('build_args', 'train_test_hold_out', test_user)
+    split = SPLIT
 
-            Tang_experiment(path, regenerate)
-            regenerate = False
+    if split == 'loso':
+        for _ in range(repeats):
+            for test_user in [1, 2, 3]:
+                print('TEST USER: ' + str(test_user))
+                path = os.path.join(archive, "test_user_" + str(test_user))
+                config_edit('build_args', 'train_test_hold_out', test_user)
+
+                Tang_experiment(path, regenerate)
+                regenerate = False
+
+    if split == 'ldo':
+        for _ in range(repeats):
+            for split_type in ['ldo_start', 'ldo_end', 'ldo_random']:
+                print('Leave-Day-Out Split: ' + str(split_type))
+                path = os.path.join(archive, "split_" + str(split_type))
+                config_edit('build_args', 'train_test_split', split_type)
+
+                Tang_experiment(path, regenerate)
+                regenerate = False
 
     return

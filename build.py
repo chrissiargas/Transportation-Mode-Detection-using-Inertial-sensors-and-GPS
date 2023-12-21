@@ -8,8 +8,7 @@ from segment import Segmenter
 import tensorflow as tf
 from transformers import spectro_transformer, temporal_transformer, one_hot_transformer, series_transformer
 import random
-import pandas as pd
-from typing import List
+from split import lopo_split, lopo_split_old
 from collections import Counter
 
 class Builder:
@@ -41,12 +40,12 @@ class Builder:
         can_load = len(os.listdir(self.load_path)) > 0
         self.motion, self.motion_info, self.location, self.loc_info = segmenter(load=can_load, verbose=not can_load)
 
-        with open('info/segmented_sizes.pickle', 'rb') as handle:
+        with open('info/' + self.conf.dataset + '/segmented_sizes.pickle', 'rb') as handle:
             sizes = pickle.load(handle)
             self.n_mot = sizes['n_mot']
             self.n_loc = sizes['n_loc']
 
-        with open('info/segmented_features.pickle', 'rb') as handle:
+        with open('info/' + self.conf.dataset + '/segmented_features.pickle', 'rb') as handle:
             features = pickle.load(handle)
             self.mot_features = features['mot_features']
             self.loc_features = features['loc_features']
@@ -62,7 +61,7 @@ class Builder:
         self.motion = motion
 
         self.total_len = len(self.motion_info)
-        self.threshold = self.conf.diff_threshold * 1000
+        self.threshold = self.conf.diff_threshold * 1000.
         self.sync_pairs = [-1 for _ in range(self.total_len)]
         self.n_modes = 8
 
@@ -118,7 +117,7 @@ class Builder:
     def assign_one(self, indices, position):
         indices = [[index, [position
                             for _ in range(self.conf.mot_bag_size)]]
-                    for index in indices]
+                   for index in indices]
 
         return indices
 
@@ -158,7 +157,7 @@ class Builder:
         else:
             indices = [[index, [random.choice(list(self.motion.keys()))
                                 for _ in range(self.conf.mot_bag_size)]]
-                        for index in indices]
+                       for index in indices]
 
         return indices
 
@@ -186,7 +185,6 @@ class Builder:
                                                  self.conf.val_bag_position,
                                                  self.conf.val_oversampling)
 
-
         self.train_size = len(self.train_indices)
         self.val_size = len(self.val_indices)
         self.test_size = len(self.test_indices)
@@ -195,106 +193,6 @@ class Builder:
             random.shuffle(self.test_indices)
             random.shuffle(self.val_indices)
             random.shuffle(self.train_indices)
-
-    def lopo_split(self, train_info, train_indices):
-        offset = 0
-        subjects = np.unique(train_info[:, 2])
-        val_indices = []
-        for subject in subjects:
-            period_indices = []
-            period_lens = []
-            period_modes = []
-
-            sub_info = train_info[train_info[:, 2] == subject]
-            dates = np.unique(sub_info[:, 3])
-            for date in dates:
-                date_sub_info = sub_info[sub_info[:, 3] == date]
-                modes = date_sub_info[:, -1]
-                N = len(modes)
-                period_splits = np.where(np.diff(modes) != 0)[0] + 1
-                mode_periods = np.split(modes, period_splits)
-                period_indices.extend(
-                    (np.concatenate(([0], period_splits)) + offset).tolist()
-                )
-                period_lens.extend([mode_period.shape[0] for mode_period in mode_periods])
-                period_modes.extend([mode_period[0] for mode_period in mode_periods])
-                offset += N
-
-            period_indices.append(offset)
-
-            mode_count = {}
-            val_mode_count = {}
-
-            for period_mode, period_len in zip(period_modes, period_lens):
-                if period_mode in mode_count.keys():
-                    mode_count[period_mode] += period_len
-                else:
-                    mode_count[period_mode] = period_len
-
-            for period_mode in mode_count.keys():
-                val_mode_count[period_mode] = int(self.conf.train_val_hold_out * mode_count[period_mode])
-                min_diff = 10000000
-                for i, (this_period_mode, this_period_len) in enumerate(zip(period_modes, period_lens)):
-                    if this_period_mode == period_mode:
-                        diff = abs(val_mode_count[period_mode] - this_period_len)
-                        if diff < min_diff:
-                            min_diff = diff
-                            best_index = i
-
-                val_indices.extend(list(range(period_indices[best_index], period_indices[best_index + 1])))
-
-        val_indices = [train_index for i, train_index in enumerate(train_indices) if train_index in val_indices]
-        train_indices = [train_index for i, train_index in enumerate(train_indices) if train_index not in val_indices]
-
-        return train_indices, val_indices
-
-    def lopo_split_old(self, dataIndices):
-        seed = 1
-
-        originalIndices = dataIndices
-        dataIndices = pd.DataFrame(dataIndices, columns=['index', 'user_label'])
-        count = dataIndices['user_label'].value_counts()
-        val_count = count * self.conf.train_val_hold_out
-        val_count = val_count.astype('int32')
-        val_indices = []
-
-        for user_label, count in val_count.items():
-
-            candidates = pd.DataFrame()
-            tmp_count = count
-
-            while candidates.empty:
-                candidates = dataIndices[dataIndices['user_label'] == user_label].user_label.groupby(
-                    [dataIndices.user_label, dataIndices.user_label.diff().ne(0).cumsum()]).transform('size').ge(
-                    tmp_count).astype(int)
-                candidates = pd.DataFrame(candidates)
-                candidates = candidates[candidates['user_label'] == 1]
-                tmp_count = int(tmp_count * 0.95)
-
-            index = candidates.sample(random_state=seed).index[0]
-            val_indices.append(index)
-            n_indices = 1
-            up = 1
-            down = 1
-            length = dataIndices.shape[0]
-
-            while n_indices < tmp_count - 1:
-
-                if index + up < length and user_label == dataIndices.iloc[index + up]['user_label']:
-                    val_indices.append(index + up)
-                    up += 1
-                    n_indices += 1
-
-                if index - down >= 0 and user_label == dataIndices.iloc[index - down]['user_label']:
-                    val_indices.append(index - down)
-                    down += 1
-                    n_indices += 1
-
-        val_indices.sort()
-        val_indices = [originalIndices.pop(i - shift)[0] for shift, i in enumerate(val_indices)]
-        train_indices = [x[0] for x in originalIndices]
-
-        return train_indices, val_indices
 
     def split(self):
         train_indices = []
@@ -311,6 +209,19 @@ class Builder:
                 print('Terminated: No test user')
                 exit()
 
+        elif self.conf.train_test_split in ['ldo_start', 'ldo_end', 'ldo_random']:
+            days = np.unique(self.motion_info[:, 3])
+
+            if self.conf.train_test_split == 'ldo_start':
+                test_days = days[:self.conf.train_test_hold_out]
+            elif self.conf.train_test_split == 'ldo_end':
+                test_days = days[-self.conf.train_test_hold_out:]
+            elif self.conf.train_test_split == 'ldo_random':
+                test_days = np.random.choice(days, size=self.conf.train_test_hold_out, replace=False)
+
+            train_indices = np.argwhere(~np.in1d(self.motion_info[:, 3], test_days)).flatten()
+            test_indices = np.argwhere(np.in1d(self.motion_info[:, 3], test_days)).flatten()
+
         if self.conf.train_val_split == 'lopo_stratified':
             split_ratio = self.conf.train_val_hold_out
             if isinstance(split_ratio, float):
@@ -326,13 +237,29 @@ class Builder:
                         else:
                             train_val_indices.append([index, user * 10 + label])
 
-                    train_indices, val_indices = self.lopo_split_old(train_val_indices)
+                    train_indices, val_indices = lopo_split_old(train_val_indices,
+                                                                self.conf.train_val_hold_out)
 
                 elif how == 'new':
-                    train_indices, val_indices = self.lopo_split(self.motion_info[train_indices], train_indices)
+                    train_indices, val_indices = lopo_split(self.motion_info[train_indices],
+                                                            train_indices,
+                                                            self.conf.train_val_hold_out)
             else:
                 print('Terminated: Wrong Hold-Out Type')
                 exit()
+
+        elif self.conf.train_val_split in ['ldo_start', 'ldo_end', 'ldo_random']:
+            days = np.unique(self.motion_info[train_indices, 3])
+
+            if self.conf.train_test_split == 'ldo_start':
+                val_days = days[:self.conf.train_val_hold_out]
+            elif self.conf.train_test_split == 'ldo_end':
+                val_days = days[-self.conf.train_val_hold_out:]
+            elif self.conf.train_test_split == 'ldo_random':
+                val_days = np.random.choice(days, size=self.conf.train_val_hold_out, replace=False)
+
+            train_indices = np.argwhere(~np.in1d(self.motion_info[:, 3], val_days)).flatten()
+            val_indices = np.argwhere(np.in1d(self.motion_info[:, 3], val_days)).flatten()
 
         self.train_indices = train_indices
         self.train_size = len(train_indices)
@@ -465,7 +392,8 @@ class Builder:
 
         else:
             if self.conf.get_position:
-                self.input_shape = (*self.motion_shape, self.loc_window_shape, self.loc_features_shape, self.conf.mot_bag_size)
+                self.input_shape = (
+                *self.motion_shape, self.loc_window_shape, self.loc_features_shape, self.conf.mot_bag_size)
                 self.input_type = (*[tf.float32 for _ in self.motion_shape], tf.float32, tf.float32, tf.string)
             else:
                 self.input_shape = (*self.motion_shape, self.loc_window_shape, self.loc_features_shape)
@@ -482,7 +410,49 @@ class Builder:
 
         return np.array(instances)
 
-    def to_generator(self, motion_transfer=False, location_transfer=False,
+    def get_Xy(self, index, positions,
+               motion_only=False, location_only=False,
+               is_training=False, one_instance=False):
+        if not location_only:
+            mot_instances = self.create_instances(index, positions)
+            mot_instances = self.motion_transformer(mot_instances, is_training)
+
+            if one_instance:
+                mot_instances = [mot_instance[np.newaxis, ...] for mot_instance in mot_instances]
+
+        if not motion_only:
+            loc_index = self.sync_pairs[index]
+
+            if loc_index == -1:
+                loc_window = np.zeros((self.conf.loc_length, len(self.loc_features)))
+                loc_window[...] = np.nan
+            else:
+                loc_window = self.location[loc_index]
+
+            loc_window, loc_features = self.location_transformer(loc_window, is_training)
+
+            if one_instance:
+                loc_window = loc_window[np.newaxis, ...]
+                loc_features = loc_features[np.newaxis, ...]
+
+        y = self.labels_transformer(self.motion_info[index])
+
+        if motion_only:
+            if self.conf.get_position:
+                return (*mot_instances, positions), y
+            else:
+                return (*mot_instances,), y
+
+        elif location_only:
+            return (loc_window, loc_features), y
+
+        else:
+            if self.conf.get_position:
+                return (*mot_instances, loc_window, loc_features, positions), y
+            else:
+                return (*mot_instances, loc_window, loc_features), y
+
+    def to_generator(self, motion_only=False, location_only=False,
                      is_training=False, is_validation=False, is_test=False):
         if is_training:
             indices = self.train_indices
@@ -498,36 +468,10 @@ class Builder:
                 bag_index = index[0]
                 bag_positions = index[1]
 
-                if not location_transfer:
-                    mot_instances = self.create_instances(bag_index, bag_positions)
-                    mot_instances = self.motion_transformer(mot_instances, is_training)
-                if not motion_transfer:
-                    loc_index = self.sync_pairs[bag_index]
-
-                    if loc_index == -1:
-                        loc_window = np.zeros((self.conf.loc_length, len(self.loc_features)))
-                        loc_window[...] = np.nan
-                    else:
-                        loc_window = self.location[loc_index]
-
-                    loc_window, loc_features = self.location_transformer(loc_window, is_training)
-
-                y = self.labels_transformer(self.motion_info[bag_index])
-
-                if motion_transfer:
-                    if self.conf.get_position:
-                        yield (*mot_instances, bag_positions), y
-                    else:
-                        yield (*mot_instances,), y
-
-                elif location_transfer:
-                    yield (loc_window, loc_features), y
-
-                else:
-                    if self.conf.get_position:
-                        yield (*mot_instances, loc_window, loc_features, bag_positions), y
-                    else:
-                        yield (*mot_instances, loc_window, loc_features), y
+                X, y = self.get_Xy(bag_index, bag_positions,
+                                   motion_only, location_only,
+                                   is_training)
+                yield X, y
 
         return tf.data.Dataset.from_generator(
             gen,
@@ -535,10 +479,10 @@ class Builder:
             output_shapes=(self.input_shape, self.output_shape)
         )
 
-    def generate(self, motion_transfer=False, location_transfer=False):
-        train = self.to_generator(motion_transfer, location_transfer, is_training=True)
-        val = self.to_generator(motion_transfer, location_transfer, is_validation=True)
-        test = self.to_generator(motion_transfer, location_transfer, is_test=True)
+    def generate(self, motion_only=False, location_only=False):
+        train = self.to_generator(motion_only, location_only, is_training=True)
+        val = self.to_generator(motion_only, location_only, is_validation=True)
+        test = self.to_generator(motion_only, location_only, is_test=True)
 
         return train, val, test
 
@@ -579,4 +523,3 @@ if __name__ == '__main__':
     train, val, test = A(motion_transfer=True, batch_prefetch=False)
     for i, instance in test.take(4):
         pass
-

@@ -83,6 +83,12 @@ class Extractor:
             self.conf.dataset
         )
 
+        if self.conf.dataset == 'SHL-complete':
+            self.from_path = os.path.join(
+                self.from_path,
+                'release'
+            )
+
         self.to_path = os.path.join(
             os.path.expanduser('~'),
             self.conf.path,
@@ -107,7 +113,7 @@ class Extractor:
             'loc_features': self.loc_features,
             'lbs_features': self.lbs_features,
         }
-        with open('info/initial_features.pickle', 'wb') as handle:
+        with open('info/' + self.conf.dataset + '/initial_features.pickle', 'wb') as handle:
             pickle.dump(features, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     def __call__(self, verbose=True, load=False, *args, **kwargs) -> Tuple[Dict, Dict, Dict]:
@@ -120,8 +126,8 @@ class Extractor:
         subject_dir = os.listdir(self.from_path)
 
         n_exists = False
-        if load and os.path.exists('info/initial_sizes.pickle'):
-            with open('info/initial_sizes.pickle', 'rb') as handle:
+        if load and os.path.exists('info/' + self.conf.dataset + '/initial_sizes.pickle'):
+            with open('info/' + self.conf.dataset + '/initial_sizes.pickle', 'rb') as handle:
                 sizes = pickle.load(handle)
                 self.n_mot = sizes['n_mot']
                 self.n_loc = sizes['n_loc']
@@ -140,12 +146,34 @@ class Extractor:
                 self.n_loc[sub_id] = {}
                 self.n_lbs[sub_id] = {}
 
-            sub_path = os.path.join(self.from_path, sub_fold,
-                                    'SHLDataset_preview_v1',
-                                    'User' + sub_id)
-            date_dir = [f for f in os.listdir(sub_path) if 'mat' not in f]
+            if self.conf.dataset == 'SHL-preview':
+                sub_path = os.path.join(self.from_path, sub_fold,
+                                        'SHLDataset_preview_v1',
+                                        'User' + sub_id)
+                date_dir = [f for f in os.listdir(sub_path) if 'mat' not in f]
 
-            for date in date_dir:
+            elif self.conf.dataset == 'SHL-complete':
+                sub_path = os.path.join(self.from_path, sub_fold)
+                date_dir = [f for f in os.listdir(sub_path) if ('pdf' not in f)]
+
+            for file_date in date_dir:
+                date_path = os.path.join(sub_path, file_date)
+                rec_dir = os.listdir(date_path)
+
+                motion_files = [rec for rec in rec_dir if 'Motion' in rec]
+                location_files = [rec for rec in rec_dir if 'Location' in rec]
+                labels_file = [rec for rec in rec_dir if 'Label' in rec]
+
+                if len(labels_file):
+                    labels_file = labels_file[0]
+                else:
+                    continue
+
+                if 'm' in file_date:
+                    date = file_date.replace('m', '')
+                    date = date + 'm'
+                else:
+                    date = file_date
 
                 location[sub_id][date] = {}
                 motion[sub_id][date] = {}
@@ -153,13 +181,6 @@ class Extractor:
                 if not n_exists:
                     self.n_mot[sub_id][date] = {}
                     self.n_loc[sub_id][date] = {}
-
-                date_path = os.path.join(sub_path, date)
-                rec_dir = os.listdir(date_path)
-
-                motion_files = [rec for rec in rec_dir if 'Motion' in rec]
-                location_files = [rec for rec in rec_dir if 'Location' in rec]
-                labels_file = 'Label.txt'
 
                 for motion_file in motion_files:
                     position, _ = motion_file.split('_')
@@ -217,6 +238,8 @@ class Extractor:
                             "wc -l < " + location_path,
                             shell=True,
                             stdout=subprocess.PIPE)
+
+
 
                         n_lines, _ = stdout.communicate()
                         n_lines = int(n_lines)
@@ -289,7 +312,7 @@ class Extractor:
                 'n_loc': self.n_loc,
                 'n_lab': self.n_lbs,
             }
-            with open('info/initial_sizes.pickle', 'wb') as handle:
+            with open('info/' + self.conf.dataset + '/initial_sizes.pickle', 'wb') as handle:
                 pickle.dump(sizes, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         return motion, location, labels

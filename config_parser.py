@@ -7,6 +7,7 @@ import ruamel
 
 class Parser:
     def __init__(self):
+        self.seq_thres = None
         self.separated_channels = None
         self.exclude_modes = None
         self.get_position = None
@@ -120,7 +121,7 @@ class Parser:
             '--build_args',
             default=dict(),
             type=dict,
-            help='pre-processing arguments'
+            help='building arguments'
         )
 
         self.parser.add_argument(
@@ -128,6 +129,13 @@ class Parser:
             default=dict(),
             type=dict,
             help='training arguments'
+        )
+        
+        self.parser.add_argument(
+            '--postprocess_args',
+            default=dict(),
+            type=dict,
+            help='postprocessing arguments'
         )
 
     def get_args(self):
@@ -223,6 +231,8 @@ class Parser:
         self.location_transfer = args.train_args['location_transfer']
         self.motorized = args.train_args['motorized']
         self.exclude_modes = args.train_args['exclude_modes']
+        
+        self.seq_thres = args.postprocess_args['seq_threshold']
         
         return
 
