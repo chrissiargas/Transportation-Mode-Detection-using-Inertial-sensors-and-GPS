@@ -9,6 +9,18 @@ import tensorflow as tf
 from transformers import spectro_transformer, temporal_transformer, one_hot_transformer, series_transformer
 import random
 from split import lopo_split, lopo_split_old
+import contextlib
+
+
+@contextlib.contextmanager
+def temp_seed(seed):
+    state = np.random.get_state()
+    np.random.seed(seed)
+    try:
+        yield
+    finally:
+        np.random.set_state(state)
+
 
 class Builder:
     def __init__(self, regenerate: bool = False):
@@ -224,7 +236,7 @@ class Builder:
         if self.conf.train_val_split == 'lopo_stratified':
             split_ratio = self.conf.train_val_hold_out
             if isinstance(split_ratio, float):
-                how = 'new'
+                how = 'old'
                 if how == 'old':
                     train_val_indices = []
                     for index, (label, user) in enumerate(zip(self.motion_info[:, 4],
@@ -255,7 +267,8 @@ class Builder:
             elif self.conf.train_test_split == 'ldo_end':
                 val_days = days[-self.conf.train_val_hold_out:]
             elif self.conf.train_test_split == 'ldo_random':
-                val_days = np.random.choice(days, size=self.conf.train_val_hold_out, replace=False)
+                with temp_seed(1):
+                    val_days = np.random.choice(days, size=self.conf.train_val_hold_out, replace=False)
 
             train_indices = np.argwhere(~np.in1d(self.motion_info[:, 3], val_days)).flatten()
             val_indices = np.argwhere(np.in1d(self.motion_info[:, 3], val_days)).flatten()
@@ -493,7 +506,10 @@ class Builder:
 
         return train, val, test
 
-    def __call__(self, motion_transfer=False, location_transfer=False, bagging=True, batch_prefetch=True):
+    def __call__(self, motion_transfer=False, location_transfer=False, bagging=True, batch_prefetch=True, init=False):
+        if init:
+            self.__init__()
+
         self.init_config()
 
         self.drop_labels(False)

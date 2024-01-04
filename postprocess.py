@@ -6,7 +6,7 @@ from keras.models import Model
 from typing import *
 import random
 import itertools
-
+from sklearn.preprocessing import normalize
 
 def get_YY_seq(data: Builder, model: Model, motion_only=False, train=False, test=False) \
         -> Tuple[List[List[Any]], List[List[Any]], List[List[Any]]]:
@@ -124,6 +124,7 @@ def get_YY_seq(data: Builder, model: Model, motion_only=False, train=False, test
         if test:
             inputs_batch = [np.array([input[i] for input in inputs_sequence]) for i in range(len(X))]
             pred_sequence = model.predict(inputs_batch, verbose=0)
+            pred_sequence = normalize(pred_sequence, axis=1, norm='l1')
             pred_sequenced.extend(pred_sequence)
 
     return true_sequenced, pred_sequenced, lens

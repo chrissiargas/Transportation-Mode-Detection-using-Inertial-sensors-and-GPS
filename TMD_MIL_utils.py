@@ -246,6 +246,7 @@ def get_classifier(L, n_units=8, has_head=False):
                  outputs=y_pred,
                  name='classifier')
 
+
 def get_MIL_model(input_shapes, dpd_motion_encoder=None, dpd_location_encoder=None):
     conf = Parser()
     conf.get_args()

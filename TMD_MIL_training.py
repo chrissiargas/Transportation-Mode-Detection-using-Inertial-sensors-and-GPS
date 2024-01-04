@@ -1,16 +1,13 @@
 import shutil
 import os
-from keras.models import Model
 from keras.optimizers import Adam
 from keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau, TensorBoard
 from keras.losses import CategoricalCrossentropy
 from keras.metrics import categorical_accuracy
 from build import Builder
-from typing import Optional
 from config_parser import Parser, config_edit
 from TMD_MIL_utils import get_motion_model, get_location_model, get_MIL_model
 from metrics import Metrics
-from typing import Tuple
 from evaluate import evaluate
 
 
@@ -263,6 +260,7 @@ def train(data: Builder, summary=True, verbose=True, load=False, path=None, eval
     motion_encoder = None
     if conf.motion_transfer == 'train' or conf.motion_transfer == 'load':
         config_edit('build_args', 'in_bags', False)
+        config_edit('build_args', 'train_oversampling', True)
 
         data, weights_file, scores = motion_train(data=data,
                                                   summary=summary,
@@ -274,6 +272,9 @@ def train(data: Builder, summary=True, verbose=True, load=False, path=None, eval
 
         motion_encoder = get_motion_model(data.input_shape)
         motion_encoder.load_weights(weights_file)
+
+        config_edit('build_args', 'in_bags', True)
+        config_edit('build_args', 'train_oversampling', False)
 
     location_encoder = None
     if conf.location_transfer == 'train' or conf.motion_transfer == 'load':
@@ -314,11 +315,12 @@ def train(data: Builder, summary=True, verbose=True, load=False, path=None, eval
     if not os.path.isdir(model_dir):
         os.makedirs(model_dir)
     try:
-        os.remove(model_path)
+        if not load:
+            os.remove(model_path)
     except OSError as e:
         print("Error: %s - %s." % (e.filename, e.strerror))
 
-    train, val, test = data()
+    train, val, test = data(init=True)
     model = get_MIL_model(data.input_shape, motion_encoder, location_encoder)
 
     if summary and verbose:
@@ -394,7 +396,7 @@ def train(data: Builder, summary=True, verbose=True, load=False, path=None, eval
     model.evaluate(test, steps=test_steps, callbacks=[test_metrics])
 
     if eval:
-        accuracy, f1, post_accuracy, post_f1, cm_df = evaluate(data, model, use_HMM)
+        accuracy, f1, post_accuracy, post_f1, cm_df = evaluate(data, model, motion_only=False, use_HMM=use_HMM)
 
     else:
         accuracy, f1, post_accuracy, post_f1, cm_df = 0., 0., 0., 0., 0.
@@ -408,14 +410,12 @@ def train(data: Builder, summary=True, verbose=True, load=False, path=None, eval
     return data, model_path, scores
 
 
-from config_parser import config_edit
-
 if __name__ == '__main__':
-    archive = os.path.join('archive', 'Tang', "save-" + '20231221-153032')
+    archive = os.path.join('archive', 'TMD_MIL', "save-" + '20240104-211306')
+    turn = 0
+    test_user = 1
 
-    test_user = 2
-
-    path = os.path.join(archive, "test_user_" + str(test_user))
+    path = os.path.join(archive, "turn_" + str(turn), "test_user_" + str(test_user))
     config_edit('build_args', 'train_test_hold_out', test_user)
 
     data = Builder()

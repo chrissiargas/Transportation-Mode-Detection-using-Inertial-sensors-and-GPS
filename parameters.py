@@ -10,7 +10,7 @@ TMD_MIL_parameters = {
     'modify_args': {
         'loc_filter': None,
         'loc_filter_window': None,
-        'loc_rescaler': 'standard',
+        'loc_rescaler': None,
         'loc_virtual_features': ['velocity', 'acceleration'],
         'mot_smoother': None,
         'mot_smoother_window': 0,
@@ -100,7 +100,8 @@ Liang_parameters = {
         'motion_form': 'temporal',
         'combine_sensors': 'concat',
         'motion_augmentations': None,
-        'batch_size': 100
+        'batch_size': 100,
+        'random': True
     },
     'train_args': {
         'epochs': 80,

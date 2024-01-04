@@ -7,9 +7,9 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 from keras.models import Model
 
 
-def evaluate(data: Builder, model: Model, use_HMM: bool = False):
-    train_Y, _, _ = postprocess.get_YY_(data, model, True, pred=False)
-    test_YY_, y, y_ = postprocess.get_YY_(data, model, True, pred=True)
+def evaluate(data: Builder, model: Model, use_HMM: bool = False, motion_only=False):
+    train_Y, _, _ = postprocess.get_YY_(data, model, motion_only, pred=False)
+    test_YY_, y, y_ = postprocess.get_YY_(data, model, motion_only, pred=True)
 
     accuracy = accuracy_score(y, y_)
     f1 = f1_score(y, y_, average='macro')

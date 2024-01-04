@@ -16,7 +16,7 @@ resample_args:
 modify_args:
   loc_filter:
   loc_filter_window:
-  loc_rescaler: standard
+  loc_rescaler:
   loc_virtual_features:
   - velocity
   - acceleration
@@ -48,12 +48,12 @@ build_args:
   diff_threshold: 60 #s
 
   train_test_split: loso       # loso, ldo_start, ldo_end, ldo_random
-  train_test_hold_out: 1
+  train_test_hold_out: 2
 
   train_val_split: lopo_stratified # lopo_stratified, ldo_start, ldo_end, ldo_random
   train_val_hold_out: 0.15
 
-  test_bag_position: same
+  test_bag_position: Hips
   test_oversampling: true
   train_bag_position: same
   train_oversampling: false

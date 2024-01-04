@@ -12,8 +12,7 @@ from typing import Tuple
 from evaluate import evaluate
 
 
-def train(data: Builder, summary=True, verbose=True, load=False, path=None, eval=False, use_HMM=False) ->\
-        Tuple[Builder, str, float, float, float]:
+def train(data: Builder, summary=True, verbose=True, load=False, path=None, eval=False, use_HMM=False):
     conf = Parser()
     conf.get_args()
 
@@ -39,7 +38,8 @@ def train(data: Builder, summary=True, verbose=True, load=False, path=None, eval
     if not os.path.isdir(model_dir):
         os.makedirs(model_dir)
     try:
-        os.remove(model_path)
+        if not load:
+            os.remove(model_path)
     except OSError as e:
         print("Error: %s - %s." % (e.filename, e.strerror))
 
@@ -113,7 +113,7 @@ def train(data: Builder, summary=True, verbose=True, load=False, path=None, eval
     model.evaluate(test, steps=test_steps, callbacks=[test_metrics])
 
     if eval:
-        accuracy, f1, post_accuracy, post_f1, cm_df = evaluate(data, model, use_HMM)
+        accuracy, f1, post_accuracy, post_f1, cm_df = evaluate(data, model,  motion_only=True, use_HMM=use_HMM)
 
     else:
         accuracy, f1, post_accuracy, post_f1, cm_df = 0., 0., 0., 0., 0.

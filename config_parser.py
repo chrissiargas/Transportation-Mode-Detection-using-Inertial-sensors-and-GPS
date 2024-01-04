@@ -3,7 +3,7 @@ import os
 import yaml
 from os.path import dirname, abspath
 import ruamel
-
+import ruamel.yaml
 
 class Parser:
     def __init__(self):
