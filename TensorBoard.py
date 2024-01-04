@@ -3,14 +3,14 @@ import os.path
 from tensorboard import program
 
 experiment = 'Tang'
-date = '20231220-003247'
-user = 1
+date = '20231222-005037'
 model = 'motion_encoder'
+split = 'ldo_start'
 tracking_address = os.path.join(
     'archive',
     experiment,
     'save-'+date,
-    'test_user_'+str(user),
+    'split_'+split,
     'logs',
     model+'_TB'
 )

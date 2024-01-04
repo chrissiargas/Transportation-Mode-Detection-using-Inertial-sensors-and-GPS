@@ -9,9 +9,10 @@ from config_parser import Parser
 from Liang_utils import get_motion_model
 from metrics import Metrics
 from typing import Tuple
+from evaluate import evaluate
 
 
-def train(data: Builder, summary=True, verbose=True, load=False, path=None, scores=False) ->\
+def train(data: Builder, summary=True, verbose=True, load=False, path=None, eval=False, use_HMM=False) ->\
         Tuple[Builder, str, float, float, float]:
     conf = Parser()
     conf.get_args()
@@ -63,61 +64,65 @@ def train(data: Builder, summary=True, verbose=True, load=False, path=None, scor
         if not os.path.isdir(model_dir):
             return None
 
-        model.load_weights(model_dir)
+        model.load_weights(model_path)
 
-    val_steps = data.val_size // conf.batch_size
-    train_steps = data.train_size // conf.batch_size
+    else:
+        val_steps = data.val_size // conf.batch_size
+        train_steps = data.train_size // conf.batch_size
+
+        tensorboard_callback = TensorBoard(log_path, histogram_freq=1)
+
+        save_model = ModelCheckpoint(
+            filepath=model_path,
+            monitor='val_loss',
+            verbose=verbose,
+            save_best_only=True,
+            mode='min',
+            save_weights_only=True)
+
+        early_stopping = EarlyStopping(
+            monitor='val_loss',
+            min_delta=0,
+            patience=30,
+            mode='min',
+            verbose=verbose)
+
+        val_metrics = Metrics(val, val_steps, 'val', verbose)
+
+        callbacks = [
+            tensorboard_callback,
+            save_model,
+            early_stopping
+        ]
+
+        history = model.fit(
+            train,
+            epochs=conf.epochs,
+            steps_per_epoch=train_steps,
+            validation_data=val,
+            validation_steps=val_steps,
+            callbacks=callbacks,
+            use_multiprocessing=True,
+            verbose=verbose
+        )
+
+        model.load_weights(model_path)
+
     test_steps = data.test_size // conf.batch_size
-
-    tensorboard_callback = TensorBoard(log_path, histogram_freq=1)
-
-    save_model = ModelCheckpoint(
-        filepath=model_path,
-        monitor='val_loss',
-        verbose=verbose,
-        save_best_only=True,
-        mode='min',
-        save_weights_only=True)
-
-    early_stopping = EarlyStopping(
-        monitor='val_loss',
-        min_delta=0,
-        patience=30,
-        mode='min',
-        verbose=verbose)
-
-    val_metrics = Metrics(val, val_steps, 'val', verbose)
-
-    callbacks = [
-        tensorboard_callback,
-        save_model,
-        early_stopping
-    ]
-
-    history = model.fit(
-        train,
-        epochs=conf.epochs,
-        steps_per_epoch=train_steps,
-        validation_data=val,
-        validation_steps=val_steps,
-        callbacks=callbacks,
-        use_multiprocessing=True,
-        verbose=verbose
-    )
-
-    model.load_weights(model_path)
-
     test_metrics = Metrics(test, test_steps, 'test', verbose)
     model.evaluate(test, steps=test_steps, callbacks=[test_metrics])
 
-    if scores:
-        pass
+    if eval:
+        accuracy, f1, post_accuracy, post_f1, cm_df = evaluate(data, model, use_HMM)
+
     else:
-        accuracy, f1_score, conf = 1., 1., 1.
+        accuracy, f1, post_accuracy, post_f1, cm_df = 0., 0., 0., 0., 0.
+
+    scores = [accuracy, f1, post_accuracy, post_f1, cm_df]
 
     del train
     del val
     del test
 
-    return data, model_path, accuracy, f1_score, conf
+    return data, model_path, scores
 

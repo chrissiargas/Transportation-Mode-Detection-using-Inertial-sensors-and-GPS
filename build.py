@@ -9,7 +9,6 @@ import tensorflow as tf
 from transformers import spectro_transformer, temporal_transformer, one_hot_transformer, series_transformer
 import random
 from split import lopo_split, lopo_split_old
-from collections import Counter
 
 class Builder:
     def __init__(self, regenerate: bool = False):
@@ -520,6 +519,6 @@ class Builder:
 
 if __name__ == '__main__':
     A = Builder(regenerate=False)
-    train, val, test = A(motion_transfer=True, batch_prefetch=False)
-    for i, instance in test.take(4):
+    train, val, test = A(motion_transfer=False, batch_prefetch=False)
+    for i, instance in test.take(100):
         pass

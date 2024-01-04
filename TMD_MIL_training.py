@@ -11,10 +11,10 @@ from config_parser import Parser, config_edit
 from TMD_MIL_utils import get_motion_model, get_location_model, get_MIL_model
 from metrics import Metrics
 from typing import Tuple
+from evaluate import evaluate
 
 
-def motion_train(data: Builder, summary=True, verbose=True, load=False, path=None, scores=False) ->\
-        Tuple[Builder, str, float, float, float]:
+def motion_train(data: Builder, summary=True, verbose=True, load=False, path=None, eval=False, use_HMM=False):
     conf = Parser()
     conf.get_args()
 
@@ -65,77 +65,79 @@ def motion_train(data: Builder, summary=True, verbose=True, load=False, path=Non
         if not os.path.isdir(model_dir):
             return None
 
-        model.load_weights(model_dir)
+        model.load_weights(model_path)
 
-    val_steps = data.val_size // conf.batch_size
-    train_steps = data.train_size // conf.batch_size
+    else:
+        val_steps = data.val_size // conf.batch_size
+        train_steps = data.train_size // conf.batch_size
+
+        tensorboard_callback = TensorBoard(log_path, histogram_freq=1)
+
+        save_model = ModelCheckpoint(
+            filepath=model_path,
+            monitor='val_loss',
+            verbose=verbose,
+            save_best_only=True,
+            mode='min',
+            save_weights_only=True)
+
+        early_stopping = EarlyStopping(
+            monitor='val_loss',
+            min_delta=0,
+            patience=15,
+            mode='min',
+            verbose=verbose)
+
+        reduce_lr_plateau = ReduceLROnPlateau(
+            monitor='val_loss',
+            factor=0.4,
+            patience=10,
+            verbose=verbose,
+            mode='min'
+        )
+
+        # val_metrics = Metrics(val, val_steps, 'val', verbose)
+
+        callbacks = [
+            tensorboard_callback,
+            save_model,
+            early_stopping,
+            reduce_lr_plateau
+        ]
+
+        history = model.fit(
+            train,
+            epochs=conf.epochs,
+            steps_per_epoch=train_steps,
+            validation_data=val,
+            validation_steps=val_steps,
+            callbacks=callbacks,
+            use_multiprocessing=True,
+            verbose=verbose
+        )
+
+        model.load_weights(model_path)
+
     test_steps = data.test_size // conf.batch_size
-
-    tensorboard_callback = TensorBoard(log_path, histogram_freq=1)
-
-    save_model = ModelCheckpoint(
-        filepath=model_path,
-        monitor='val_loss',
-        verbose=verbose,
-        save_best_only=True,
-        mode='min',
-        save_weights_only=True)
-
-    early_stopping = EarlyStopping(
-        monitor='val_loss',
-        min_delta=0,
-        patience=30,
-        mode='min',
-        verbose=verbose)
-
-    reduce_lr_plateau = ReduceLROnPlateau(
-        monitor='val_loss',
-        factor=0.4,
-        patience=10,
-        verbose=verbose,
-        mode='min'
-    )
-
-    val_metrics = Metrics(val, val_steps, 'val', verbose)
-
-    callbacks = [
-        tensorboard_callback,
-        save_model,
-        early_stopping,
-        reduce_lr_plateau,
-        val_metrics
-    ]
-
-    history = model.fit(
-        train,
-        epochs=conf.epochs,
-        steps_per_epoch=train_steps,
-        validation_data=val,
-        validation_steps=val_steps,
-        callbacks=callbacks,
-        use_multiprocessing=True,
-        verbose=verbose
-    )
-
-    model.load_weights(model_path)
-
     test_metrics = Metrics(test, test_steps, 'test', verbose)
     model.evaluate(test, steps=test_steps, callbacks=[test_metrics])
 
-    if scores:
-        pass
+    if eval:
+        accuracy, f1, post_accuracy, post_f1, cm_df = evaluate(data, model, use_HMM)
+
     else:
-        accuracy, f1_score, conf = 1., 1., 1.
+        accuracy, f1, post_accuracy, post_f1, cm_df = 0., 0., 0., 0., 0.
+
+    scores = [accuracy, f1, post_accuracy, post_f1, cm_df]
 
     del train
     del val
     del test
 
-    return data, model_path, accuracy, f1_score, conf
+    return data, model_path, scores
 
 
-def location_train(data: Builder, summary=True, verbose=True, load=False, path=None, scores=False) ->\
-        Tuple[Builder, str, float, float, float]:
+def location_train(data: Builder, summary=True, verbose=True, load=False, path=None, eval=False, use_HMM=False):
     conf = Parser()
     conf.get_args()
 
@@ -183,76 +185,78 @@ def location_train(data: Builder, summary=True, verbose=True, load=False, path=N
         if not os.path.isdir(model_dir):
             return None
 
-        model.load_weights(model_dir)
+        model.load_weights(model_path)
 
-    val_steps = data.val_size // conf.batch_size
-    train_steps = data.train_size // conf.batch_size
+    else:
+        val_steps = data.val_size // conf.batch_size
+        train_steps = data.train_size // conf.batch_size
+
+        tensorboard_callback = TensorBoard(log_path, histogram_freq=1)
+
+        save_model = ModelCheckpoint(
+            filepath=model_path,
+            monitor='val_loss',
+            verbose=verbose,
+            save_best_only=True,
+            mode='min',
+            save_weights_only=True)
+
+        early_stopping = EarlyStopping(
+            monitor='val_loss',
+            min_delta=0,
+            patience=30,
+            mode='auto',
+            verbose=verbose)
+
+        reduce_lr_plateau = ReduceLROnPlateau(
+            monitor='val_loss',
+            factor=0.4,
+            patience=10,
+            verbose=verbose,
+            mode='min'
+        )
+
+        # val_metrics = Metrics(val, val_steps, verbose)
+
+        callbacks = [
+            tensorboard_callback,
+            save_model,
+            early_stopping,
+            reduce_lr_plateau
+        ]
+
+        history = model.fit(
+            train,
+            epochs=conf.epochs,
+            steps_per_epoch=train_steps,
+            validation_data=val,
+            validation_steps=val_steps,
+            callbacks=callbacks,
+            use_multiprocessing=True,
+            verbose=verbose
+        )
+
+        model.load_weights(model_path)
+
     test_steps = data.test_size // conf.batch_size
-
-    tensorboard_callback = TensorBoard(log_path, histogram_freq=1)
-
-    save_model = ModelCheckpoint(
-        filepath=model_path,
-        monitor='val_loss',
-        verbose=verbose,
-        save_best_only=True,
-        mode='min',
-        save_weights_only=True)
-
-    early_stopping = EarlyStopping(
-        monitor='val_loss',
-        min_delta=0,
-        patience=30,
-        mode='auto',
-        verbose=verbose)
-
-    reduce_lr_plateau = ReduceLROnPlateau(
-        monitor='val_loss',
-        factor=0.4,
-        patience=10,
-        verbose=verbose,
-        mode='min'
-    )
-
-    val_metrics = Metrics(val, val_steps, verbose)
-
-    callbacks = [
-        tensorboard_callback,
-        save_model,
-        early_stopping,
-        reduce_lr_plateau,
-        val_metrics
-    ]
-
-    history = model.fit(
-        train,
-        epochs=conf.epochs,
-        steps_per_epoch=train_steps,
-        validation_data=val,
-        validation_steps=val_steps,
-        callbacks=callbacks,
-        use_multiprocessing=True,
-        verbose=verbose
-    )
-
-    model.load_weights(model_path)
-
     test_metrics = Metrics(test, test_steps, verbose)
     model.evaluate(test, steps=test_steps, callbacks=[test_metrics])
 
-    if scores:
-        pass
+    if eval:
+        accuracy, f1, post_accuracy, post_f1, cm_df = evaluate(data, model, use_HMM)
     else:
-        accuracy, f1_score, conf = 1., 1., 1.
+        accuracy, f1, post_accuracy, post_f1, cm_df = 0., 0., 0., 0., 0.
+
+    scores = [accuracy, f1, post_accuracy, post_f1, cm_df]
 
     del train
     del val
     del test
 
-    return data, model_path, accuracy, f1_score, conf
+    return data, model_path, scores
 
 
-def train(data: Builder, summary=True, verbose=True, load=False, path=None) -> Optional[Model]:
+def train(data: Builder, summary=True, verbose=True, load=False, path=None, eval=False, use_HMM=False):
     conf = Parser()
     conf.get_args()
 
@@ -260,17 +264,16 @@ def train(data: Builder, summary=True, verbose=True, load=False, path=None) -> O
     if conf.motion_transfer == 'train' or conf.motion_transfer == 'load':
         config_edit('build_args', 'in_bags', False)
 
-        data, weights_file, accuracy, f1_score, conf = motion_train(data=data,
-                                                                    summary=summary,
-                                                                    verbose=verbose,
-                                                                    load=(conf.motion_transfer == 'load'),
-                                                                    path=path,
-                                                                    scores=False)
+        data, weights_file, scores = motion_train(data=data,
+                                                  summary=summary,
+                                                  verbose=verbose,
+                                                  load=(conf.motion_transfer == 'load'),
+                                                  path=path,
+                                                  eval=False,
+                                                  use_HMM=False)
 
         motion_encoder = get_motion_model(data.input_shape)
         motion_encoder.load_weights(weights_file)
-
-        return None
 
     location_encoder = None
     if conf.location_transfer == 'train' or conf.motion_transfer == 'load':
@@ -279,7 +282,8 @@ def train(data: Builder, summary=True, verbose=True, load=False, path=None) -> O
                                                                       verbose=verbose,
                                                                       load=(conf.motion_transfer == 'load'),
                                                                       path=path,
-                                                                      scores=False)
+                                                                      eval=False,
+                                                                      use_HMM=False)
 
         location_encoder = get_location_model(data.input_shape)
         location_encoder.load_weights(weights_file)
@@ -315,7 +319,7 @@ def train(data: Builder, summary=True, verbose=True, load=False, path=None) -> O
         print("Error: %s - %s." % (e.filename, e.strerror))
 
     train, val, test = data()
-    model = get_MIL_model(input_shapes=data.input_shape)
+    model = get_MIL_model(data.input_shape, motion_encoder, location_encoder)
 
     if summary and verbose:
         print(model.summary())
@@ -331,61 +335,88 @@ def train(data: Builder, summary=True, verbose=True, load=False, path=None) -> O
         if not os.path.isdir(model_dir):
             return None
 
-        model.load_weights(model_dir)
+        model.load_weights(model_path)
 
-    val_steps = data.val_size // conf.batch_size
-    train_steps = data.train_size // conf.batch_size
+    else:
+        val_steps = data.val_size // conf.batch_size
+        train_steps = data.train_size // conf.batch_size
+
+        tensorboard_callback = TensorBoard(log_path, histogram_freq=1)
+
+        save_model = ModelCheckpoint(
+            filepath=model_path,
+            monitor='val_loss',
+            verbose=verbose,
+            save_best_only=True,
+            mode='min',
+            save_weights_only=True)
+
+        early_stopping = EarlyStopping(
+            monitor='val_loss',
+            min_delta=0,
+            patience=30,
+            mode='auto',
+            verbose=verbose)
+
+        reduce_lr_plateau = ReduceLROnPlateau(
+            monitor='val_loss',
+            factor=0.4,
+            patience=10,
+            verbose=verbose,
+            mode='min'
+        )
+
+        # val_metrics = Metrics(val, val_steps, verbose)
+
+        callbacks = [
+            tensorboard_callback,
+            save_model,
+            early_stopping,
+            reduce_lr_plateau
+        ]
+
+        history = model.fit(
+            train,
+            epochs=conf.epochs,
+            steps_per_epoch=train_steps,
+            validation_data=val,
+            validation_steps=val_steps,
+            callbacks=callbacks,
+            use_multiprocessing=True,
+            verbose=verbose
+        )
+
+        model.load_weights(model_path)
+
     test_steps = data.test_size // conf.batch_size
-
-    tensorboard_callback = TensorBoard(log_path, histogram_freq=1)
-
-    save_model = ModelCheckpoint(
-        filepath=model_path,
-        monitor='val_loss',
-        verbose=verbose,
-        save_best_only=True,
-        mode='min',
-        save_weights_only=True)
-
-    early_stopping = EarlyStopping(
-        monitor='val_loss',
-        min_delta=0,
-        patience=30,
-        mode='auto',
-        verbose=verbose)
-
-    reduce_lr_plateau = ReduceLROnPlateau(
-        monitor='val_loss',
-        factor=0.4,
-        patience=10,
-        verbose=verbose,
-        mode='min'
-    )
-
-    val_metrics = Metrics(val, val_steps, verbose)
-
-    callbacks = [
-        tensorboard_callback,
-        save_model,
-        early_stopping,
-        reduce_lr_plateau,
-        val_metrics
-    ]
-
-    history = model.fit(
-        train,
-        epochs=conf.epochs,
-        steps_per_epoch=train_steps,
-        validation_data=val,
-        validation_steps=val_steps,
-        callbacks=callbacks,
-        use_multiprocessing=True,
-        verbose=verbose
-    )
-
-    model.load_weights(model_path)
 
     test_metrics = Metrics(test, test_steps, verbose)
     model.evaluate(test, steps=test_steps, callbacks=[test_metrics])
 
-    return history
+    if eval:
+        accuracy, f1, post_accuracy, post_f1, cm_df = evaluate(data, model, use_HMM)
+
+    else:
+        accuracy, f1, post_accuracy, post_f1, cm_df = 0., 0., 0., 0., 0.
+
+    scores = [accuracy, f1, post_accuracy, post_f1, cm_df]
+
+    del train
+    del val
+    del test
+
+    return data, model_path, scores
+
+
+from config_parser import config_edit
+
+if __name__ == '__main__':
+    archive = os.path.join('archive', 'Tang', "save-" + '20231221-153032')
+
+    test_user = 2
+
+    path = os.path.join(archive, "test_user_" + str(test_user))
+    config_edit('build_args', 'train_test_hold_out', test_user)
+
+    data = Builder()
+    history = train(data, summary=False, verbose=True, load=True, path=path, eval=True, use_HMM=True)

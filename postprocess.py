@@ -18,6 +18,19 @@ def get_YY_seq(data: Builder, model: Model, motion_only=False, train=False, test
             train_indices = np.argwhere(data.motion_info[:, 2] != test_user).flatten()
             test_indices = np.argwhere(data.motion_info[:, 2] == test_user).flatten()
 
+    elif data.conf.train_test_split in ['ldo_start', 'ldo_end', 'ldo_random']:
+        days = np.unique(data.motion_info[:, 3])
+
+        if data.conf.train_test_split == 'ldo_start':
+            test_days = days[:data.conf.train_test_hold_out]
+        elif data.conf.train_test_split == 'ldo_end':
+            test_days = days[-data.conf.train_test_hold_out:]
+        elif data.conf.train_test_split == 'ldo_random':
+            test_days = np.random.choice(days, size=data.conf.train_test_hold_out, replace=False)
+
+        train_indices = np.argwhere(~np.in1d(data.motion_info[:, 3], test_days)).flatten()
+        test_indices = np.argwhere(np.in1d(data.motion_info[:, 3], test_days)).flatten()
+
     if train:
         indices = train_indices
     elif test:

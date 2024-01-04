@@ -65,7 +65,7 @@ def train(data: Builder, summary=True, verbose=True, load=False, path=None, eval
     if load:
         if not os.path.isdir(model_dir):
             return None
-        print(model_path)
+
         model.load_weights(model_path)
 
     else:
@@ -111,8 +111,8 @@ def train(data: Builder, summary=True, verbose=True, load=False, path=None, eval
         model.load_weights(model_path)
 
     test_steps = data.test_size // conf.batch_size
-    # test_metrics = Metrics(test, test_steps, 'test', verbose)
-    # model.evaluate(test, steps=test_steps, callbacks=[test_metrics])
+    test_metrics = Metrics(test, test_steps, 'test', verbose)
+    model.evaluate(test, steps=test_steps, callbacks=[test_metrics])
 
     if eval:
         accuracy, f1, post_accuracy, post_f1, cm_df = evaluate(data, model, use_HMM)

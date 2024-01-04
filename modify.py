@@ -256,13 +256,14 @@ class Modifier:
         return velocity
 
     def get_acceleration(self, lat, long, time, i):
-        vel1 = self.get_velocity(lat, long, time, i)
-        vel2 = self.get_velocity(lat, long, time, i-1)
+        vel1 = self.get_velocity(lat, long, time, i-1)
+        vel2 = self.get_velocity(lat, long, time, i)
         if np.isnan([vel1, vel2]).any():
             return np.nan
 
-        dvel = vel1 - vel2
+        dvel = vel2 - vel1
         acceleration = 1000. * dvel / (time[i] - time[i-1])
+
         return acceleration
 
     def expand_features(self, orig_features: np.ndarray) -> np.ndarray:

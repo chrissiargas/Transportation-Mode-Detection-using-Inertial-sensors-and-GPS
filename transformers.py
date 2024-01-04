@@ -293,6 +293,7 @@ class series_transformer:
 
         self.stat_features = ['Min', 'Max', 'Mean', 'Std']
         self.arithmetic_features = ['Distance', 'Velocity', 'Movability']
+        self.NaN_value = 0
 
         self.length = self.conf.loc_length
         self.channels = 0
@@ -348,34 +349,36 @@ class series_transformer:
         for feature in self.conf.window_features:
             if feature in self.stat_features:
                 if feature == 'Mean':
-                    values = [np.nanmean(window[:, i]) for i in range(window.shape[1])]
+                    values = [np.mean(window[:, i]) for i in range(window.shape[1])]
 
                 elif feature == 'Std':
-                    values = [np.nanstd(window[:, i]) for i in range(window.shape[1])]
+                    values = [np.std(window[:, i]) for i in range(window.shape[1])]
 
                 elif feature == 'Min':
-                    values = [np.nanmin(window[:, i]) for i in range(window.shape[1])]
+                    values = [np.min(window[:, i]) for i in range(window.shape[1])]
 
                 elif feature == 'Max':
-                    values = [np.nanmax(window[:, i]) for i in range(window.shape[1])]
+                    values = [np.max(window[:, i]) for i in range(window.shape[1])]
 
                 features[n: n + len(values)] = values
                 n += len(values)
 
             if feature in self.arithmetic_features:
                 if feature == 'Movability':
-                    time = input[:, self.time_features['Time']]
-                    lat = input[:, self.time_features['Lat']]
-                    long = input[:, self.time_features['Long']]
+                    if np.isnan(input).any():
+                        value = np.nan
+                    else:
+                        lat = input[:, self.time_features['Lat']]
+                        long = input[:, self.time_features['Long']]
 
-                    start_point = (lat[0], long[0])
-                    end_point = (lat[-1], long[-1])
-                    total_distance = great_circle(start_point, end_point).m
+                        start_point = (lat[0], long[0])
+                        end_point = (lat[-1], long[-1])
+                        total_distance = great_circle(start_point, end_point).m
 
-                    distances = [self.get_distance(lat, long, time, i) for i in range(1, input.shape[0])]
-                    sum_distance = sum(distances)
+                        distances = [self.get_distance(lat, long, i) for i in range(1, input.shape[0])]
+                        sum_distance = sum(distances)
 
-                    value = total_distance / (sum_distance + 1e-10)
+                        value = total_distance / (sum_distance + 1e-10)
 
                 features[n] = value
                 n += 1
@@ -383,5 +386,8 @@ class series_transformer:
         if self.conf.in_bags:
             window = window[np.newaxis, ...]
             features = features[np.newaxis, ...]
+
+        window = np.nan_to_num(window, nan=self.NaN_value)
+        features = np.nan_to_num(features, nan=self.NaN_value)
 
         return window, features

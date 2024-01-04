@@ -10,7 +10,7 @@ TMD_MIL_parameters = {
     'modify_args': {
         'loc_filter': None,
         'loc_filter_window': None,
-        'loc_rescaler': None,
+        'loc_rescaler': 'standard',
         'loc_virtual_features': ['velocity', 'acceleration'],
         'mot_smoother': None,
         'mot_smoother_window': 0,
@@ -33,12 +33,12 @@ TMD_MIL_parameters = {
         'test_bag_position': 'same',
         'test_oversampling': True,
         'train_bag_position': 'same',
-        'train_oversampling': True,
+        'train_oversampling': False,
         'val_bag_position': 'same',
         'val_oversampling': True,
         'motion_features': ['acc_normXYZ', 'acc_jerk'],
         'in_bags': True,
-        'get_position': False,
+        'get_position': True,
         'motion_form': 'spectrogram',
         'combine_sensors': 'concat',
         'motion_augmentations': None,
@@ -51,7 +51,7 @@ TMD_MIL_parameters = {
         'time_features': ['velocity', 'acceleration'],
         'window_features': ['Movability', 'Mean', 'Std'],
         'batch_size': 32,
-        'random': False
+        'random': True
     },
     'train_args': {
         'L': 256,
@@ -60,7 +60,7 @@ TMD_MIL_parameters = {
         'motion_epochs': 80,
         'location_epochs': 200,
         'learning_rate': 0.0001,
-        'motion_transfer': 'train',
+        'motion_transfer': 'skip',
         'location_transfer': 'skip',
         'motorized': False,
         'exclude_modes': ['undefined']
@@ -159,5 +159,27 @@ Tang_parameters = {
         'learning_rate': 0.0001,
         'motorized': False,
         'exclude_modes': ['undefined']
+    }
+}
+
+SHL_preview_params = {
+    'extract_args': {
+        'dataset': 'SHL-preview'
+    },
+    'build_args': {
+        'GPS_position': 'Hand',
+        'train_val_split': 'lopo_stratified',
+        'train_val_hold_out': 0.15
+    }
+}
+
+SHL_complete_params = {
+    'extract_args': {
+        'dataset': 'SHL-complete'
+    },
+    'build_args': {
+        'GPS_position': 'Hips',
+        'train_val_split': 'ldo_random',
+        'train_val_hold_out': 10
     }
 }

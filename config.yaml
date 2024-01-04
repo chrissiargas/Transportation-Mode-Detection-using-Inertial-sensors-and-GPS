@@ -1,13 +1,13 @@
 extract_args:
   path: Datasets
-  dataset: SHL-complete #SHL-preview or SHL-complete
+  dataset: SHL-preview #SHL-preview or SHL-complete
   signals:
   - Acc
   - Gyr
   - Mag
 resample_args:
   old_motion_fs: 100 #Hz
-  new_motion_fs: 20
+  new_motion_fs: 10
   old_location_T: 1 #s
   new_location_T: 60
   max_distance: 2 #s
@@ -16,36 +16,30 @@ resample_args:
 modify_args:
   loc_filter:
   loc_filter_window:
-  loc_rescaler:
+  loc_rescaler: standard
   loc_virtual_features:
   - velocity
   - acceleration
-  mot_smoother: moving_average
-  mot_smoother_window: 5
+  mot_smoother:
+  mot_smoother_window: 0
   mot_filter:
   mot_filter_window: 0
   mot_rescaler:
   mot_virtual_signals:
   - acc_normXYZ
-  - acc_jerkX
-  - acc_jerkY
-  - acc_jerkZ
-  - mag_jerkX
-  - mag_jerkY
-  - mag_jerkZ
-  - gyr_normXYZ
+  - acc_jerk
 segment_args:
   loc_length: 12 # samples
   loc_stride: 1
 
-  mot_length: 1200
-  mot_stride: 1200
+  mot_length: 600
+  mot_stride: 600
 
-  mot_bag_size: 1
-  mot_bag_step: 0
+  mot_bag_size: 3
+  mot_bag_step: 600
 
 build_args:
-  GPS_position: Hips
+  GPS_position: Hand
   inertial_positions:
   - Hand
   - Torso
@@ -53,35 +47,26 @@ build_args:
   - Hips
   diff_threshold: 60 #s
 
-  train_test_split: ldo_start  # loso, ldo_start, ldo_end, ldo_random
-  train_test_hold_out: 20
+  train_test_split: loso       # loso, ldo_start, ldo_end, ldo_random
+  train_test_hold_out: 1
 
-  train_val_split: ldo_start # lopo_stratified, ldo_start, ldo_end, ldo_random
-  train_val_hold_out: 5
+  train_val_split: lopo_stratified # lopo_stratified, ldo_start, ldo_end, ldo_random
+  train_val_hold_out: 0.15
 
   test_bag_position: same
   test_oversampling: true
   train_bag_position: same
-  train_oversampling: true
+  train_oversampling: false
   val_bag_position: same
   val_oversampling: true
 
   motion_features:
   - acc_normXYZ
-  - acc_jerkX
-  - acc_jerkY
-  - acc_jerkZ
-  - mag_jerkX
-  - mag_jerkY
-  - mag_jerkZ
-  - Gyr_x
-  - Gyr_y
-  - Gyr_z
-  - gyr_normXYZ
-  in_bags: false
+  - acc_jerk
+  in_bags: true
 
-  motion_form: temporal
-  combine_sensors: separate # concat, separate
+  motion_form: spectrogram
+  combine_sensors: concat   # concat, separate
   motion_augmentations: # ['Jittering','Permutation','TimeWarp','Rotation']
   separated_channels:
   - - acc_jerkX
@@ -103,7 +88,7 @@ build_args:
   - freq_mask
   - time_mask
   location_augmentation: true
-  get_position: false
+  get_position: true
 
   time_features:
   - velocity
@@ -112,7 +97,7 @@ build_args:
   - Movability
   - Mean
   - Std
-  batch_size: 50
+  batch_size: 32
   random: true
 
 train_args:
@@ -125,7 +110,7 @@ train_args:
 
   learning_rate: 0.0001
 
-  motion_transfer: train
+  motion_transfer: skip
   location_transfer: skip
 
   motorized: false

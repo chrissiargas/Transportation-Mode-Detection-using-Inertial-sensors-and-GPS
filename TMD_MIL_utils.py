@@ -1,13 +1,11 @@
 import tensorflow as tf
 import keras
-import os
 import keras.backend as K
 from keras.layers import *
 from keras import Input
 from keras import initializers, regularizers
 from keras.models import Model
 from config_parser import Parser
-
 
 def get_spectrogram_encoder(input_shapes, L, use_dropout=False):
     initializer = initializers.he_uniform()
@@ -145,6 +143,8 @@ def get_MIL_attention(L, D):
 
 
 def get_location_encoder(input_shapes, L):
+    mask_value = -1000000.
+
     initializer = initializers.he_uniform()
     window_shape = input_shapes[0]
     features_shape = input_shapes[1]
@@ -154,8 +154,10 @@ def get_location_encoder(input_shapes, L):
 
     X = window
 
-    masking = Masking(mask_value=0, name='location_mask_1')
-    X = masking(X)
+    # w_masking = Masking(mask_value=mask_value, name='window_masking_layer')
+    # X = w_masking(X)
+
+    X = window
 
     norm = BatchNormalization(name='location_norm_1', trainable=False)
     X = norm(X)
@@ -170,7 +172,6 @@ def get_location_encoder(input_shapes, L):
         kernel_initializer=initializer,
         name='location_dense_1'
     )
-
     norm = BatchNormalization(name='location_norm_2', trainable=False)
     activation = ReLU()
 
@@ -183,7 +184,6 @@ def get_location_encoder(input_shapes, L):
         kernel_initializer=initializer,
         name='location_dense_2'
     )
-
     norm = BatchNormalization(name='location_norm_3', trainable=False)
     activation = ReLU()
 
@@ -196,7 +196,6 @@ def get_location_encoder(input_shapes, L):
         kernel_initializer=initializer,
         name='location_dense_3'
     )
-
     norm = BatchNormalization(name='location_norm_4', trainable=False)
     activation = ReLU()
 
@@ -204,12 +203,13 @@ def get_location_encoder(input_shapes, L):
     X = norm(X)
     X = activation(X)
 
-    mask_w = K.switch(
-        tf.reduce_all(tf.equal(features, 0), axis=1, keepdims=True),
-        lambda: tf.zeros_like(X), lambda: tf.ones_like(X)
-    )
+    # mask_w = K.switch(
+    #     tf.reduce_any(tf.equal(features, mask_value), axis=1, keepdims=True),
+    #     lambda: tf.zeros_like(X), lambda: tf.ones_like(X)
+    # )
 
-    output = tf.multiply(X, mask_w)
+    # output = tf.multiply(X, mask_w)
+    output = X
 
     return Model(inputs=[window, features],
                  outputs=output,
@@ -234,16 +234,17 @@ def get_classifier(L, n_units=8, has_head=False):
         X = activation(X)
 
     dense = Dense(units=n_units,
-                  activation='sigmoid',
-                  kernel_initializer=initializers.glorot_uniform(),
-                  name='class_layer')
+                  kernel_initializer=initializers.he_uniform(),
+                  name='final_dense')
 
-    y_pred = dense(X)
+    X = dense(X)
+
+    activation = tf.keras.layers.Activation(activation='sigmoid', name='class_activation')
+    y_pred = activation(X)
 
     return Model(inputs=input,
                  outputs=y_pred,
                  name='classifier')
-
 
 def get_MIL_model(input_shapes, dpd_motion_encoder=None, dpd_location_encoder=None):
     conf = Parser()
