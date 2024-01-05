@@ -44,7 +44,7 @@ def train(data: Builder, summary=True, verbose=True, load=False, path=None, eval
         print("Error: %s - %s." % (e.filename, e.strerror))
 
     train, val, test = data(motion_transfer=True)
-    model = get_motion_model(input_shapes=data.input_shape)
+    model = get_motion_model(input_shapes=data.input_shape, n_classes=data.n_modes)
 
     if summary and verbose:
         print(model.summary())

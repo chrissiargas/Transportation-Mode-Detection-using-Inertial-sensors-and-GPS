@@ -12,11 +12,11 @@ import TMD_MIL_training
 import Liang_training
 import Tang_training
 
-REGENERATE = False
-SPLIT = 'loso'
-DATASET = 'SHL-preview'
+REGENERATE = True
+SPLIT = 'ldo_random'
+DATASET = 'SHL-complete'
 EXP_TYPE = 'all_positions'
-REPEATS = 1
+REPEATS = 3
 scores_df = pd.DataFrame()
 
 
@@ -341,7 +341,7 @@ def Tang(archive_path):
     config_edit('build_args', 'train_test_split', split)
 
     if exp_type == 'all_positions':
-        for position in ['Bag', 'Hand', 'Hips', 'Torso']:
+        for position in ['Hips', 'Torso']:
             config_edit('build_args', 'test_bag_position', position)
             config_edit('build_args', 'val_bag_position', 'same')
             config_edit('build_args', 'train_bag_position', 'same')
@@ -372,7 +372,7 @@ def Tang(archive_path):
                     regenerate = False
 
     elif exp_type == 'one_position':
-        for position in ['Bag', 'Hand', 'Hips', 'Torso']:
+        for position in ['Hips', 'Torso']:
             config_edit('build_args', 'train_bag_position', position)
             config_edit('build_args', 'val_bag_position', position)
             config_edit('build_args', 'test_bag_position', position)

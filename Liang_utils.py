@@ -73,7 +73,7 @@ def get_classifier(n_units=8):
                  name='classifier')
 
 
-def get_motion_model(input_shapes, n_classes):
+def get_motion_model(input_shapes, n_classes=8):
     conf = Parser()
     conf.get_args()
 
