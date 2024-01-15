@@ -12,12 +12,13 @@ import TMD_MIL_training
 import Liang_training
 import Tang_training
 
-REGENERATE = True
-SPLIT = 'ldo_random'
-DATASET = 'SHL-complete'
+REGENERATE = False
+SPLIT = 'loso'
+DATASET = 'SHL-preview'
 EXP_TYPE = 'all_positions'
 REPEATS = 3
 scores_df = pd.DataFrame()
+POSITIONS = ['Torso']
 
 
 def config_save(file):
@@ -157,7 +158,7 @@ def TMD_MIL(archive_path):
     config_edit('build_args', 'train_test_split', split)
 
     if exp_type == 'all_positions':
-        for position in ['Bag', 'Hand', 'Hips', 'Torso']:
+        for position in POSITIONS:
             config_edit('build_args', 'test_bag_position', position)
             config_edit('build_args', 'val_bag_position', 'same')
             config_edit('build_args', 'train_bag_position', 'same')
@@ -188,7 +189,7 @@ def TMD_MIL(archive_path):
                     regenerate = False
 
     elif exp_type == 'one_position':
-        for position in ['Bag', 'Hand', 'Hips', 'Torso']:
+        for position in POSITIONS:
             config_edit('build_args', 'train_bag_position', position)
             config_edit('build_args', 'val_bag_position', position)
             config_edit('build_args', 'test_bag_position', position)
@@ -249,7 +250,7 @@ def Liang(archive_path):
     config_edit('build_args', 'train_test_split', split)
 
     if exp_type == 'all_positions':
-        for position in ['Bag', 'Hand', 'Hips', 'Torso']:
+        for position in POSITIONS:
             config_edit('build_args', 'test_bag_position', position)
             config_edit('build_args', 'val_bag_position', 'same')
             config_edit('build_args', 'train_bag_position', 'same')
@@ -269,6 +270,17 @@ def Liang(archive_path):
                         save(saves_path)
                         regenerate = False
 
+            elif split == 'random':
+                config_edit('build_args', 'train_test_hold_out', 0.2)
+                for turn in range(repeats):
+                    path = os.path.join(archive, "turn_" + str(turn))
+
+                    scores = Liang_experiment(path, regenerate)
+
+                    get_scores(scores, postprocessing=True)
+                    save(saves_path)
+                    regenerate = False
+
             else:
                 for turn in range(repeats):
                     path = os.path.join(archive, "turn_" + str(turn))
@@ -280,7 +292,7 @@ def Liang(archive_path):
                     regenerate = False
 
     elif exp_type == 'one_position':
-        for position in ['Bag', 'Hand', 'Hips', 'Torso']:
+        for position in POSITIONS:
             config_edit('build_args', 'train_bag_position', position)
             config_edit('build_args', 'val_bag_position', position)
             config_edit('build_args', 'test_bag_position', position)
@@ -299,6 +311,17 @@ def Liang(archive_path):
                         get_scores(scores, test_user, True)
                         save(saves_path)
                         regenerate = False
+
+            elif split == 'random':
+                config_edit('build_args', 'train_test_hold_out', 0.2)
+                for turn in range(repeats):
+                    path = os.path.join(archive, "turn_" + str(turn))
+
+                    scores = Liang_experiment(path, regenerate)
+
+                    get_scores(scores, postprocessing=True)
+                    save(saves_path)
+                    regenerate = False
 
             else:
                 for turn in range(repeats):
@@ -341,7 +364,7 @@ def Tang(archive_path):
     config_edit('build_args', 'train_test_split', split)
 
     if exp_type == 'all_positions':
-        for position in ['Hips', 'Torso']:
+        for position in POSITIONS:
             config_edit('build_args', 'test_bag_position', position)
             config_edit('build_args', 'val_bag_position', 'same')
             config_edit('build_args', 'train_bag_position', 'same')
@@ -372,7 +395,7 @@ def Tang(archive_path):
                     regenerate = False
 
     elif exp_type == 'one_position':
-        for position in ['Hips', 'Torso']:
+        for position in POSITIONS:
             config_edit('build_args', 'train_bag_position', position)
             config_edit('build_args', 'val_bag_position', position)
             config_edit('build_args', 'test_bag_position', position)

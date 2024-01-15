@@ -24,6 +24,8 @@ def evaluate(data: Builder, model: Model, use_HMM: bool = False, motion_only=Fal
 
     post_accuracy = None
     post_f1 = None
+
+    print(train_Y)
     if use_HMM:
         HMM = HMM_classifier()
         HMM.fit(train_Y)

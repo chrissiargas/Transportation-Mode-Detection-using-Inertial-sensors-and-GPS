@@ -83,7 +83,7 @@ def train(data: Builder, summary=True, verbose=True, load=False, path=None, eval
         early_stopping = EarlyStopping(
             monitor='val_loss',
             min_delta=0,
-            patience=30,
+            patience=10,
             mode='min',
             verbose=verbose)
 
@@ -126,3 +126,20 @@ def train(data: Builder, summary=True, verbose=True, load=False, path=None, eval
 
     return data, model_path, scores
 
+from config_parser import config_edit
+
+
+if __name__ == '__main__':
+    archive = os.path.join('archive', 'Liang', "save-" + '20240111-164621')
+
+    turn = 0
+    test_user = None
+
+    if test_user is not None:
+        path = os.path.join(archive, "turn_" + str(turn), "test_user_" + str(test_user))
+        config_edit('build_args', 'train_test_hold_out', test_user)
+    else:
+        path = os.path.join(archive, "turn_" + str(turn))
+
+    data = Builder()
+    history = train(data, summary=False, verbose=True, load=True, path=path, eval=True, use_HMM=True)

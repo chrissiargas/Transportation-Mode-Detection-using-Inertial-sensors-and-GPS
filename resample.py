@@ -120,13 +120,16 @@ class Resampler:
                     else:
                         mmap = np.memmap(dst, mode='w+', dtype=np.float64, shape=shape)
 
-                        mmap[:, 0] = self.motion[sub_id][date][position][::step, 0]
-                        mmap[:, 1:] = ssn.decimate(
-                            x=self.motion[sub_id][date][position][:, 1:],
-                            q=step,
-                            ftype='fir',
-                            axis=0
-                        )
+                        if self.conf.mot_sampling_method == 'decimate':
+                            mmap[:, 0] = self.motion[sub_id][date][position][::step, 0]
+                            mmap[:, 1:] = ssn.decimate(
+                                x=self.motion[sub_id][date][position][:, 1:],
+                                q=step,
+                                ftype='fir',
+                                axis=0
+                            )
+                        elif self.conf.mot_sampling_method == 'step':
+                            mmap[...] = self.motion[sub_id][date][position][::step, :]
 
                     self.n_mot[sub_id][date][position] = n_lines
                     resampled_motion[sub_id][date][position] = mmap
@@ -233,7 +236,7 @@ class Resampler:
                         old_t = old_loc[:, 0]
                         old_recordings = old_loc[:, 1:]
                         new_t = np.arange(old_t[0], old_t[-1] + 1e-4, step=self.new_location_T)
-                        f = interp1d(old_t, old_recordings, kind=self.conf.sampling_method, axis=0, fill_value='extrapolate')
+                        f = interp1d(old_t, old_recordings, kind=self.conf.loc_sampling_method, axis=0, fill_value='extrapolate')
                         new_recordings = f(new_t)
                         new_recordings[valid_points == -1] = np.nan
                         mmap[...] = np.concatenate((new_t[:, np.newaxis], new_recordings), axis=1)

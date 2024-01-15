@@ -7,6 +7,9 @@ from typing import *
 import random
 import itertools
 from sklearn.preprocessing import normalize
+from sklearn.model_selection import train_test_split
+from build import temp_seed
+
 
 def get_YY_seq(data: Builder, model: Model, motion_only=False, train=False, test=False) \
         -> Tuple[List[List[Any]], List[List[Any]], List[List[Any]]]:
@@ -18,6 +21,15 @@ def get_YY_seq(data: Builder, model: Model, motion_only=False, train=False, test
             train_indices = np.argwhere(data.motion_info[:, 2] != test_user).flatten()
             test_indices = np.argwhere(data.motion_info[:, 2] == test_user).flatten()
 
+    elif data.conf.train_test_split == 'random':
+        labels = data.motion_info[:, -1]
+        indices = np.arange(labels.shape[0])
+        train_indices, test_indices, _, _ = train_test_split(indices,
+                                                             labels,
+                                                             stratify=labels,
+                                                             test_size=data.conf.train_test_hold_out,
+                                                             random_state=48)
+
     elif data.conf.train_test_split in ['ldo_start', 'ldo_end', 'ldo_random']:
         days = np.unique(data.motion_info[:, 3])
 
@@ -26,7 +38,8 @@ def get_YY_seq(data: Builder, model: Model, motion_only=False, train=False, test
         elif data.conf.train_test_split == 'ldo_end':
             test_days = days[-data.conf.train_test_hold_out:]
         elif data.conf.train_test_split == 'ldo_random':
-            test_days = np.random.choice(days, size=data.conf.train_test_hold_out, replace=False)
+            with temp_seed(48):
+                test_days = np.random.choice(days, size=data.conf.train_test_hold_out, replace=False)
 
         train_indices = np.argwhere(~np.in1d(data.motion_info[:, 3], test_days)).flatten()
         test_indices = np.argwhere(np.in1d(data.motion_info[:, 3], test_days)).flatten()

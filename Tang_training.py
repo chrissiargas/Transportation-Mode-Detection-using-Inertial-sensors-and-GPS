@@ -111,7 +111,7 @@ def train(data: Builder, summary=True, verbose=True, load=False, path=None, eval
 
     test_steps = data.test_size // conf.batch_size
     test_metrics = Metrics(test, test_steps, 'test', verbose)
-    model.evaluate(test, steps=test_steps, callbacks=[test_metrics])
+    # model.evaluate(test, steps=test_steps, callbacks=[test_metrics])
 
     if eval:
         accuracy, f1, post_accuracy, post_f1, cm_df = evaluate(data, model,  motion_only=True, use_HMM=use_HMM)

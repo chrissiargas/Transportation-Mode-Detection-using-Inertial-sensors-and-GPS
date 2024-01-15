@@ -190,12 +190,20 @@ class Modifier:
         exp_signals = np.concatenate((orig_signals, virt_signals), axis=1)
         return exp_signals
 
-    def rescale_signals(self, orig_signals: np.ndarray) -> np.ndarray:
+    def rescale_signals(self, orig_signals: np.ndarray, mean: float=None, std:float=None) -> np.ndarray:
         sc_signals = orig_signals.copy()
 
         if self.conf.mot_rescaler == 'standard':
-            rescaler = StandardScaler()
-            sc_signals[:, 1:] = rescaler.fit_transform(orig_signals[:, 1:])
+
+            if mean is not None and std is not None:
+                rescaler = StandardScaler(with_mean=True, with_std=True)
+                rescaler.mean_ = mean
+                rescaler.scale_ = std
+                sc_signals[:, 1:] = rescaler.transform(orig_signals[:, 1:])
+
+            else:
+                rescaler = StandardScaler()
+                sc_signals[:, 1:] = rescaler.fit_transform(orig_signals[:, 1:])
 
         return sc_signals
 
@@ -203,6 +211,7 @@ class Modifier:
         print("Modifying Motion Data...")
 
         modified_motion = {}
+
         for sub_id in self.motion.keys():
             modified_motion[sub_id] = {}
             for date in self.motion[sub_id].keys():
@@ -212,23 +221,14 @@ class Modifier:
                     dst = os.path.join(self.modified_path, filename)
                     exists = os.path.exists(dst)
 
-                    n_lines = self.n_mot[sub_id][date][position]
-                    shape = (n_lines, self.n_mot_features)
-
                     if load and exists:
-                        mmap = np.memmap(dst, mode='r+', dtype=np.float64, shape=shape)
+                        modified_motion[sub_id][date][position] = None
                     else:
-                        mmap = np.memmap(dst, mode='w+', dtype=np.float64, shape=shape)
-
                         orig_signals = self.motion[sub_id][date][position]
-                        modified_signals = self.filter_signals(orig_signals)
+                        modified_signals = self.expand_signals(orig_signals)
+                        modified_signals = self.filter_signals(modified_signals)
                         modified_signals = self.smooth_signals(modified_signals)
-                        modified_signals = self.expand_signals(modified_signals)
-                        modified_signals = self.rescale_signals(modified_signals)
-
-                        mmap[...] = modified_signals
-
-                    modified_motion[sub_id][date][position] = mmap
+                        modified_motion[sub_id][date][position] = modified_signals
 
                 filename = sub_id + '_' + date + '_' + 'labels' + '.mmap'
                 dst = os.path.join(self.modified_path, filename)
@@ -242,6 +242,45 @@ class Modifier:
                 else:
                     mmap = np.memmap(dst, mode='w+', dtype=np.int64, shape=shape)
                     mmap[...] = self.labels[sub_id][date]
+
+        total_mean = None
+        total_std = None
+        if self.conf.mot_rescaler == 'standard' and not load:
+            all_signals = None
+            for sub_id in modified_motion.keys():
+                for date in modified_motion[sub_id].keys():
+                    for position in modified_motion[sub_id][date].keys():
+                        modified_signals = modified_motion[sub_id][date][position]
+                        if all_signals is None:
+                            all_signals = modified_signals[:, 1:]
+                        else:
+                            all_signals = np.concatenate((all_signals, modified_signals[:, 1:]), axis=0)
+
+            total_mean = np.nanmean(all_signals, axis=0)
+            total_std = np.nanstd(all_signals, axis=0)
+            del all_signals
+
+        for sub_id in modified_motion.keys():
+            for date in modified_motion[sub_id].keys():
+                for position in modified_motion[sub_id][date].keys():
+                    filename = sub_id + '_' + date + '_' + position + '_' + 'motion' + '.mmap'
+                    dst = os.path.join(self.modified_path, filename)
+                    exists = os.path.exists(dst)
+
+                    n_lines = self.n_mot[sub_id][date][position]
+                    shape = (n_lines, self.n_mot_features)
+
+                    if load and exists:
+                        mmap = np.memmap(dst, mode='r+', dtype=np.float64, shape=shape)
+                    else:
+                        mmap = np.memmap(dst, mode='w+', dtype=np.float64, shape=shape)
+
+                        modified_signals = modified_motion[sub_id][date][position]
+                        modified_signals = self.rescale_signals(modified_signals, total_mean, total_std)
+
+                        mmap[...] = modified_signals
+
+                    modified_motion[sub_id][date][position] = mmap
 
         return modified_motion, self.labels
 

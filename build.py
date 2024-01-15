@@ -10,6 +10,7 @@ from transformers import spectro_transformer, temporal_transformer, one_hot_tran
 import random
 from split import lopo_split, lopo_split_old
 import contextlib
+from sklearn.model_selection import train_test_split
 
 
 @contextlib.contextmanager
@@ -220,6 +221,16 @@ class Builder:
                 print('Terminated: No test user')
                 exit()
 
+        elif self.conf.train_test_split == 'random':
+            labels = self.motion_info[:, 4]
+            indices = np.arange(labels.shape[0])
+
+            train_indices, test_indices, _, _ = train_test_split(indices,
+                                                                 labels,
+                                                                 stratify=labels,
+                                                                 test_size=self.conf.train_test_hold_out,
+                                                                 random_state=48)
+
         elif self.conf.train_test_split in ['ldo_start', 'ldo_end', 'ldo_random']:
             days = np.unique(self.motion_info[:, 3])
 
@@ -228,7 +239,8 @@ class Builder:
             elif self.conf.train_test_split == 'ldo_end':
                 test_days = days[-self.conf.train_test_hold_out:]
             elif self.conf.train_test_split == 'ldo_random':
-                test_days = np.random.choice(days, size=self.conf.train_test_hold_out, replace=False)
+                with temp_seed(48):
+                    test_days = np.random.choice(days, size=self.conf.train_test_hold_out, replace=False)
 
             train_indices = np.argwhere(~np.in1d(self.motion_info[:, 3], test_days)).flatten()
             test_indices = np.argwhere(np.in1d(self.motion_info[:, 3], test_days)).flatten()
@@ -259,6 +271,14 @@ class Builder:
                 print('Terminated: Wrong Hold-Out Type')
                 exit()
 
+        elif self.conf.train_val_split == 'random':
+            train_labels = self.motion_info[train_indices, -1]
+
+            train_indices, val_indices, _, _ = train_test_split(train_indices,
+                                                                train_labels,
+                                                                stratify=train_labels,
+                                                                test_size=self.conf.train_val_hold_out)
+
         elif self.conf.train_val_split in ['ldo_start', 'ldo_end', 'ldo_random']:
             days = np.unique(self.motion_info[train_indices, 3])
 
@@ -267,7 +287,7 @@ class Builder:
             elif self.conf.train_test_split == 'ldo_end':
                 val_days = days[-self.conf.train_val_hold_out:]
             elif self.conf.train_test_split == 'ldo_random':
-                with temp_seed(1):
+                with temp_seed(48):
                     val_days = np.random.choice(days, size=self.conf.train_val_hold_out, replace=False)
 
             train_indices = np.argwhere(~np.in1d(self.motion_info[:, 3], val_days)).flatten()
@@ -314,16 +334,14 @@ class Builder:
 
     def drop_labels(self, after_split: bool = False):
         Out = []
-        In = []
         for target in self.conf.exclude_modes:
             target_id = self.mode_ids[target]
-            for i, info in enumerate(self.motion_info):
-                if info[-1] == target_id:
-                    Out.append(i)
-                else:
-                    In.append(i)
+
+            tg_out = np.argwhere(self.motion_info[:, -1] == target_id).flatten().tolist()
+            Out.extend(tg_out)
 
             self.modes.remove(target)
+
         self.mode_ids = {mode: id for id, mode in enumerate(self.modes)}
 
         if after_split:
@@ -336,9 +354,9 @@ class Builder:
             self.test_size = len(self.test_indices)
 
         else:
-            self.motion_info = self.motion_info[In]
+            self.motion_info = np.delete(self.motion_info, Out, axis=0)
             for position in self.motion.keys():
-                self.motion[position] = self.motion[position][In]
+                self.motion[position] = np.delete(self.motion[position], Out, axis=0)
 
         if self.conf.motorized:
             motorized_modes = ['car', 'bus', 'train', 'subway']
@@ -355,6 +373,8 @@ class Builder:
                     counter += 1
                 elif mode in motorized_modes:
                     self.mode_ids[mode] = len(self.modes) - 1
+
+        self.n_modes = len(self.modes)
 
     def drop_GPS_loss(self, thres: int = 1):
         dropped = []
@@ -405,7 +425,7 @@ class Builder:
         else:
             if self.conf.get_position:
                 self.input_shape = (
-                *self.motion_shape, self.loc_window_shape, self.loc_features_shape, self.conf.mot_bag_size)
+                    *self.motion_shape, self.loc_window_shape, self.loc_features_shape, self.conf.mot_bag_size)
                 self.input_type = (*[tf.float32 for _ in self.motion_shape], tf.float32, tf.float32, tf.string)
             else:
                 self.input_shape = (*self.motion_shape, self.loc_window_shape, self.loc_features_shape)
@@ -515,11 +535,13 @@ class Builder:
         self.drop_labels(False)
         self.drop_nans(False)
 
-        if bagging:
+        if bagging and not motion_transfer:
             self.combine_to_bags()
 
         self.split()
-        self.drop_GPS_loss(thres=0)
+
+        if not motion_transfer:
+            self.drop_GPS_loss(thres=0)
 
         self.assign_position()
 

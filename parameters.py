@@ -5,7 +5,8 @@ TMD_MIL_parameters = {
         'old_location_T': 1,
         'new_location_T': 60,
         'max_distance': 2,
-        'sampling_method': 'nearest'
+        'mot_sampling_method': 'decimate',
+        'loc_sampling_method': 'nearest'
     },
     'modify_args': {
         'loc_filter': None,
@@ -70,7 +71,8 @@ TMD_MIL_parameters = {
 Liang_parameters = {
     'resample_args': {
         'old_motion_fs': 100,
-        'new_motion_fs': 50
+        'new_motion_fs': 50,
+        'mot_sampling_method': 'step'
     },
     'modify_args': {
         'mot_smoother': 'moving_average',
@@ -82,7 +84,7 @@ Liang_parameters = {
     },
     'segment_args': {
         'mot_length': 512,
-        'mot_stride': 64,
+        'mot_stride': 256,
 
         'mot_bag_size': 1,
         'mot_bag_step': 0
@@ -107,14 +109,15 @@ Liang_parameters = {
         'epochs': 80,
         'learning_rate': 0.0001,
         'motorized': False,
-        'exclude_modes': ['undefined']
+        'exclude_modes': ['undefined', 'run']
     }
 }
 
 Tang_parameters = {
     'resample_args': {
         'old_motion_fs': 100,
-        'new_motion_fs': 20
+        'new_motion_fs': 20,
+        'mot_sampling_method': 'decimate'
     },
     'modify_args': {
         'mot_smoother': 'moving_average',

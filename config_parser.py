@@ -69,7 +69,8 @@ class Parser:
         self.old_location_T = None
         self.location_T = None
         self.max_distance = None
-        self.sampling_method = None
+        self.loc_sampling_method = None
+        self.mot_sampling_method = None
         self.new_fs = None
         self.old_fs = None
         self.signals = None
@@ -167,7 +168,8 @@ class Parser:
         self.old_location_T = args.resample_args['old_location_T']
         self.location_T = args.resample_args['new_location_T']
         self.max_distance = args.resample_args['max_distance']
-        self.sampling_method = args.resample_args['sampling_method']
+        self.loc_sampling_method = args.resample_args['loc_sampling_method']
+        self.mot_sampling_method = args.resample_args['mot_sampling_method']
 
         self.loc_filter = args.modify_args['loc_filter']
         self.mot_filter = args.modify_args['mot_filter']
