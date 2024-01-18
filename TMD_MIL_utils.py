@@ -7,6 +7,9 @@ from keras import initializers, regularizers
 from keras.models import Model
 from config_parser import Parser
 
+CLASS_ACTIVATION = 'sigmoid'
+
+
 def get_spectrogram_encoder(input_shapes, L, use_dropout=False):
     initializer = initializers.he_uniform()
 
@@ -239,7 +242,7 @@ def get_classifier(L, n_units=8, has_head=False):
 
     X = dense(X)
 
-    activation = tf.keras.layers.Activation(activation='sigmoid', name='class_activation')
+    activation = tf.keras.layers.Activation(activation=CLASS_ACTIVATION, name='class_activation')
     y_pred = activation(X)
 
     return Model(inputs=input,

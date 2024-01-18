@@ -33,9 +33,20 @@ class Extractor:
             10: 'Mag_z',
         }
 
+        self.lacc = {
+            17: 'Lacc_x',
+            18: 'Lacc_y',
+            19: 'Lacc_z'
+        }
+
+        self.bar = {
+            20: 'Bar'
+        }
+
         self.n_mot_features = 1
         self.mot_features = ['Time']
         self.mot_signals = []
+
         for signal in self.conf.signals:
             if signal == 'Acc':
                 self.n_mot_features += 3
@@ -49,6 +60,14 @@ class Extractor:
                 self.n_mot_features += 3
                 self.mot_features.extend(list(self.mag.values()))
                 self.mot_signals.append(self.mag)
+            if signal == 'Lacc':
+                self.n_mot_features += 3
+                self.mot_features.extend(list(self.lacc.values()))
+                self.mot_signals.append(self.lacc)
+            elif signal == 'Bar':
+                self.n_mot_features += 1
+                self.mot_features.extend(list(self.bar.values()))
+                self.mot_signals.append(self.bar)
 
         self.mot_features = {k:v for v, k in enumerate(self.mot_features)}
 

@@ -1,4 +1,4 @@
-from experiments import TMD_MIL, Liang, Tang
+from experiments import TMD_MIL, Liang, Tang, Wang
 import warnings
 import os
 import tensorflow as tf
@@ -10,7 +10,7 @@ gpus = tf.config.experimental.list_physical_devices('GPU')
 for gpu in gpus:
     tf.config.experimental.set_memory_growth(gpu, True)
 
-EXPERIMENT = 'Liang'
+EXPERIMENT = 'Wang'
 
 
 def main(experiment):
@@ -24,6 +24,9 @@ def main(experiment):
 
     elif experiment == 'Tang':
         Tang(archive)
+
+    elif experiment == 'Wang':
+        Wang(archive)
 
 
 if __name__ == '__main__':

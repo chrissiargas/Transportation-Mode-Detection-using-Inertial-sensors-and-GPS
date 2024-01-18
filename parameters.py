@@ -1,4 +1,7 @@
 TMD_MIL_parameters = {
+    'extract_args': {
+        'signals': ['Acc']
+    },
     'resample_args': {
         'old_motion_fs': 100,
         'new_motion_fs': 10,
@@ -61,7 +64,7 @@ TMD_MIL_parameters = {
         'motion_epochs': 80,
         'location_epochs': 200,
         'learning_rate': 0.0001,
-        'motion_transfer': 'skip',
+        'motion_transfer': 'train',
         'location_transfer': 'skip',
         'motorized': False,
         'exclude_modes': ['undefined']
@@ -69,6 +72,9 @@ TMD_MIL_parameters = {
 }
 
 Liang_parameters = {
+    'extract_args': {
+        'signals': ['Acc']
+    },
     'resample_args': {
         'old_motion_fs': 100,
         'new_motion_fs': 50,
@@ -114,6 +120,9 @@ Liang_parameters = {
 }
 
 Tang_parameters = {
+    'extract_args': {
+        'signals': ['Acc', 'Gyr', 'Mag']
+    },
     'resample_args': {
         'old_motion_fs': 100,
         'new_motion_fs': 20,
@@ -161,6 +170,60 @@ Tang_parameters = {
     'train_args': {
         'epochs': 80,
         'learning_rate': 0.0001,
+        'motorized': False,
+        'exclude_modes': ['undefined']
+    }
+}
+
+Wang_parameters = {
+    'extract_args': {
+        'signals': ['Lacc', 'Mag', 'Gyr', 'Bar']
+    },
+    'resample_args': {
+        'old_motion_fs': 100,
+        'new_motion_fs': 50,
+        'mot_sampling_method': 'step'
+    },
+    'modify_args': {
+        'mot_smoother': None,
+        'mot_smoother_window': 5,
+        'mot_filter': None,
+        'mot_filter_window': 0,
+        'mot_rescaler': 'standard',
+        'mot_virtual_signals': []
+    },
+    'segment_args': {
+        'mot_length': 450,
+        'mot_stride': 450,
+
+        'mot_bag_size': 1,
+        'mot_bag_step': 0
+    },
+    'build_args': {
+        'test_bag_position': 'same',
+        'test_oversampling': True,
+        'train_bag_position': 'same',
+        'train_oversampling': True,
+        'val_bag_position': 'same',
+        'val_oversampling': True,
+        'motion_features': ['Lacc_x', 'Lacc_y', 'Lacc_z',
+                            'Gyr_x', 'Gyr_y', 'Gyr_z',
+                            'Mag_x', 'Mag_y', 'Mag_z',
+                            'Bar'],
+        'in_bags': False,
+        'get_position': False,
+        'motion_form': 'temporal',
+        'combine_sensors': 'separate',
+        'separated_channels': [['Lacc_x', 'Lacc_y', 'Lacc_z'],
+                               ['Gyr_x', 'Gyr_y', 'Gyr_z'],
+                               ['Mag_x', 'Mag_y', 'Mag_z'],
+                               ['Bar']],
+        'motion_augmentations': None,
+        'batch_size': 100
+    },
+    'train_args': {
+        'epochs': 100,
+        'learning_rate': 0.001,
         'motorized': False,
         'exclude_modes': ['undefined']
     }

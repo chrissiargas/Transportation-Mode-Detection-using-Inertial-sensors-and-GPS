@@ -5,20 +5,21 @@ import os
 import time
 import gc
 
-from parameters import TMD_MIL_parameters, Liang_parameters, Tang_parameters, SHL_complete_params, SHL_preview_params
+from parameters import TMD_MIL_parameters, Liang_parameters, Tang_parameters, SHL_complete_params, SHL_preview_params, Wang_parameters
 from build import Builder
 from config_parser import config_edit
 import TMD_MIL_training
 import Liang_training
 import Tang_training
+import Wang_training
 
 REGENERATE = False
 SPLIT = 'loso'
 DATASET = 'SHL-preview'
 EXP_TYPE = 'all_positions'
-REPEATS = 3
+REPEATS = 15
 scores_df = pd.DataFrame()
-POSITIONS = ['Torso']
+POSITIONS = ['same']
 
 
 def config_save(file):
@@ -130,6 +131,14 @@ def Tang_experiment(path, regenerate=False):
     return scores
 
 
+def Wang_experiment(path, regenerate=False):
+    data = Builder(regenerate)
+    _, _, scores = Wang_training.train(data, summary=True, verbose=True, load=False, path=path, eval=True, use_HMM=True)
+    del data
+
+    return scores
+
+
 def TMD_MIL(archive_path):
     global scores_df
     params = TMD_MIL_parameters
@@ -167,7 +176,7 @@ def TMD_MIL(archive_path):
             saves_path = os.path.join(archive, position)
 
             if split == 'loso':
-                for test_user in [1, 2, 3]:
+                for test_user in [3]:
                     print('TEST USER: ' + str(test_user))
                     config_edit('build_args', 'train_test_hold_out', test_user)
                     for turn in range(repeats):
@@ -420,6 +429,98 @@ def Tang(archive_path):
                     path = os.path.join(archive, "turn_" + str(turn))
 
                     scores = Tang_experiment(path, regenerate)
+
+                    get_scores(scores, postprocessing=True)
+                    save(saves_path)
+                    regenerate = False
+
+    return
+
+
+def Wang(archive_path):
+    global scores_df
+    params = Wang_parameters
+
+    for param_group, group_params in params.items():
+        for param_name, param_value in group_params.items():
+            config_edit(param_group, param_name, param_value)
+
+    if DATASET == 'SHL-preview':
+        data_params = SHL_preview_params
+    elif DATASET == 'SHL-complete':
+        data_params = SHL_complete_params
+
+    for param_group, group_params in data_params.items():
+        for param_name, param_value in group_params.items():
+            config_edit(param_group, param_name, param_value)
+
+    archive = os.path.join(archive_path, "save-" + time.strftime("%Y%m%d-%H%M%S"))
+    reset_tensorflow_keras_backend()
+
+    repeats = REPEATS
+    regenerate = REGENERATE
+    split = SPLIT
+    exp_type = EXP_TYPE
+
+    config_edit('build_args', 'train_test_split', split)
+
+    if exp_type == 'all_positions':
+        for position in POSITIONS:
+            config_edit('build_args', 'test_bag_position', position)
+            config_edit('build_args', 'val_bag_position', 'same')
+            config_edit('build_args', 'train_bag_position', 'same')
+
+            scores_df = pd.DataFrame()
+            saves_path = os.path.join(archive, position)
+
+            if split == 'loso':
+                for test_user in [1, 2, 3]:
+                    print('TEST USER: ' + str(test_user))
+                    config_edit('build_args', 'train_test_hold_out', test_user)
+                    for turn in range(repeats):
+                        path = os.path.join(archive, "turn_" + str(turn), "test_user_" + str(test_user))
+                        scores = Wang_experiment(path, regenerate)
+
+                        get_scores(scores, test_user, True)
+                        save(saves_path)
+                        regenerate = False
+
+            else:
+                for turn in range(repeats):
+                    path = os.path.join(archive, "turn_" + str(turn))
+
+                    scores = Wang_experiment(path, regenerate)
+
+                    get_scores(scores, postprocessing=True)
+                    save(saves_path)
+                    regenerate = False
+
+    elif exp_type == 'one_position':
+        for position in POSITIONS:
+            config_edit('build_args', 'train_bag_position', position)
+            config_edit('build_args', 'val_bag_position', position)
+            config_edit('build_args', 'test_bag_position', position)
+
+            scores_df = pd.DataFrame()
+            saves_path = os.path.join(archive, position)
+
+            if split == 'loso':
+                for test_user in [1, 2, 3]:
+                    print('TEST USER: ' + str(test_user))
+                    config_edit('build_args', 'train_test_hold_out', test_user)
+                    for turn in range(repeats):
+                        path = os.path.join(archive, "turn_" + str(turn), "test_user_" + str(test_user))
+                        scores = Wang_experiment(path, regenerate)
+
+                        get_scores(scores, test_user, True)
+                        save(saves_path)
+                        regenerate = False
+
+            else:
+                for turn in range(repeats):
+                    path = os.path.join(archive, "turn_" + str(turn))
+
+                    scores = Wang_experiment(path, regenerate)
 
                     get_scores(scores, postprocessing=True)
                     save(saves_path)

@@ -9,6 +9,7 @@ import itertools
 from sklearn.preprocessing import normalize
 from sklearn.model_selection import train_test_split
 from build import temp_seed
+from keras.layers import Softmax
 
 
 def get_YY_seq(data: Builder, model: Model, motion_only=False, train=False, test=False) \
@@ -144,6 +145,8 @@ def get_YY_seq(data: Builder, model: Model, motion_only=False, train=False, test
 
 
 def get_YY_(data: Builder, model: Model, motion_only: bool = False, pred: bool = False):
+    model.get_layer('classifier').get_layer('class_activation').activation = Softmax()
+
     if pred:
         train = False
         test = True

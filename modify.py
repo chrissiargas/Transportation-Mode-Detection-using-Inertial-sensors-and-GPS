@@ -39,7 +39,7 @@ class Modifier:
         if not os.path.exists(self.modified_path):
             os.makedirs(self.modified_path)
 
-        self.avail_mot_sensors = ['acc', 'gyr', 'mag']
+        self.avail_mot_sensors = ['acc', 'gyr', 'mag', 'lacc', 'bar']
         self.avail_mot_features = ['normXYZ', 'jerk', 'jerkX', 'jerkY', 'jerkZ']
 
         with open('info/' + self.conf.dataset + '/initial_features.pickle', 'rb') as handle:
@@ -154,13 +154,14 @@ class Modifier:
             if sensor in self.avail_mot_sensors:
                 if sensor == 'acc':
                     sensor_features = [self.mot_features[feature] for feature in ['Acc_x', 'Acc_y', 'Acc_z']]
-                    sensor_signals = orig_signals[:, sensor_features]
                 elif sensor == 'gyr':
                     sensor_features = [self.mot_features[feature] for feature in ['Gyr_x', 'Gyr_y', 'Gyr_z']]
-                    sensor_signals = orig_signals[:, sensor_features]
                 elif sensor == 'mag':
                     sensor_features = [self.mot_features[feature] for feature in ['Mag_x', 'Mag_y', 'Mag_z']]
-                    sensor_signals = orig_signals[:, sensor_features]
+                elif sensor == 'lacc':
+                    sensor_features = [self.mot_features[feature] for feature in ['Lacc_x', 'Lacc_y', 'Lacc_z']]
+                sensor_signals = orig_signals[:, sensor_features]
+
             else:
                 sensor_signals = None
                 print('Unknown sensor {}'.format(sensor))
@@ -332,23 +333,25 @@ class Modifier:
 
         exp_features = np.concatenate((orig_features, virt_features), axis=1)
 
-        # plt.plot(lat[:20], long[:20], '-o')
-        # plt.show()
-        # plt.plot(virt_features[:20])
-        # plt.show()
-
         return exp_features
 
-    def rescale_features(self, orig_signals: np.ndarray) -> np.ndarray:
+    def rescale_features(self, orig_signals: np.ndarray, mean: float = None, std: float = None) -> np.ndarray:
         sc_signals = orig_signals.copy()
 
         if self.conf.mot_rescaler == 'standard':
-            rescaler = StandardScaler()
-            sc_signals[:, 5:] = rescaler.fit_transform(orig_signals[:, 5:])
+            if mean is not None and std is not None:
+                rescaler = StandardScaler(with_mean=True, with_std=True)
+                rescaler.mean_ = mean
+                rescaler.scale_ = std
+                sc_signals[:, 5:] = rescaler.fit_transform(orig_signals[:, 5:])
+
+            else:
+                rescaler = StandardScaler()
+                sc_signals[:, 5:] = rescaler.fit_transform(orig_signals[:, 5:])
 
         return sc_signals
 
-    def modify_location(self, load: bool = False, n_exists: bool = False) -> Tuple[Dict, Dict]:
+    def modify_location(self, load: bool = False, n_exists: bool = False) -> Dict:
         print("Modifying Location Data...")
 
         modified_location = {}
@@ -356,6 +359,38 @@ class Modifier:
             modified_location[sub_id] = {}
             for date in self.location[sub_id].keys():
                 modified_location[sub_id][date] = {}
+                for position in self.location[sub_id][date].keys():
+                    filename = sub_id + '_' + date + '_' + position + '_' + 'location' + '.mmap'
+                    dst = os.path.join(self.modified_path, filename)
+                    exists = os.path.exists(dst)
+
+                    if load and exists:
+                        modified_location[sub_id][date][position] = None
+                    else:
+                        orig_features = self.location[sub_id][date][position]
+                        modified_features = self.expand_features(orig_features)
+                        modified_features = self.rescale_features(modified_features)
+                        modified_location[sub_id][date][position] = modified_features
+
+        total_mean = None
+        total_std = None
+        if self.conf.loc_rescaler == 'standard' and not load:
+            all_features = None
+            for sub_id in self.location.keys():
+                for date in self.location[sub_id].keys():
+                    for position in self.location[sub_id][date].keys():
+                        modified_features = modified_location[sub_id][date][position]
+                        if all_features is None:
+                            all_features = modified_features[:, 5:]
+                        else:
+                            all_features = np.concatenate((all_features, modified_features[:, 5:]), axis=0)
+
+            total_mean = np.nanmean(all_features, axis=0)
+            total_std = np.nanstd(all_features, axis=0)
+            del all_features
+
+        for sub_id in self.location.keys():
+            for date in self.location[sub_id].keys():
                 for position in self.location[sub_id][date].keys():
                     filename = sub_id + '_' + date + '_' + position + '_' + 'location' + '.mmap'
                     dst = os.path.join(self.modified_path, filename)
@@ -369,9 +404,8 @@ class Modifier:
                     else:
                         mmap = np.memmap(dst, mode='w+', dtype=np.float64, shape=shape)
 
-                        orig_features = self.location[sub_id][date][position]
-                        modified_features = self.expand_features(orig_features)
-                        modified_features = self.rescale_features(modified_features)
+                        modified_features = modified_location[sub_id][date][position]
+                        modified_features = self.rescale_features(modified_features, total_mean, total_std)
 
                         mmap[...] = modified_features
 
