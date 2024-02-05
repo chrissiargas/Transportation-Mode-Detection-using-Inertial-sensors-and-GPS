@@ -37,7 +37,7 @@ TMD_MIL_parameters = {
         'test_bag_position': 'same',
         'test_oversampling': True,
         'train_bag_position': 'same',
-        'train_oversampling': False,
+        'train_oversampling': True,
         'val_bag_position': 'same',
         'val_oversampling': True,
         'motion_features': ['acc_normXYZ', 'acc_jerk'],
@@ -60,12 +60,14 @@ TMD_MIL_parameters = {
     'train_args': {
         'L': 256,
         'D': 256,
+        'motion_MIL': False,
+        'fusion': 'MIL',
         'epochs': 80,
         'motion_epochs': 80,
         'location_epochs': 200,
         'learning_rate': 0.0001,
-        'motion_transfer': 'train',
-        'location_transfer': 'skip',
+        'motion_encoder': 'skip',
+        'location_encoder': 'skip',
         'motorized': False,
         'exclude_modes': ['undefined']
     }
@@ -193,8 +195,8 @@ Wang_parameters = {
         'mot_virtual_signals': []
     },
     'segment_args': {
-        'mot_length': 450,
-        'mot_stride': 450,
+        'mot_length': 512,
+        'mot_stride': 256,
 
         'mot_bag_size': 1,
         'mot_bag_step': 0
@@ -219,11 +221,117 @@ Wang_parameters = {
                                ['Mag_x', 'Mag_y', 'Mag_z'],
                                ['Bar']],
         'motion_augmentations': None,
-        'batch_size': 100
+        'batch_size': 100,
+        'random': True
     },
     'train_args': {
         'epochs': 100,
-        'learning_rate': 0.001,
+        'learning_rate': 0.0001,
+        'motorized': False,
+        'exclude_modes': ['undefined']
+    }
+}
+
+
+Liu_parameters = {
+    'extract_args': {
+        'signals': ['Lacc', 'Mag', 'Gyr', 'Bar']
+    },
+    'resample_args': {
+        'old_motion_fs': 100,
+        'new_motion_fs': 50,
+        'mot_sampling_method': 'step'
+    },
+    'modify_args': {
+        'mot_smoother': None,
+        'mot_smoother_window': 5,
+        'mot_filter': None,
+        'mot_filter_window': 0,
+        'mot_rescaler': 'standard',
+        'mot_virtual_signals': []
+    },
+    'segment_args': {
+        'mot_length': 500,
+        'mot_stride': 500,
+
+        'mot_bag_size': 1,
+        'mot_bag_step': 0
+    },
+    'build_args': {
+        'test_bag_position': 'same',
+        'test_oversampling': True,
+        'train_bag_position': 'same',
+        'train_oversampling': True,
+        'val_bag_position': 'same',
+        'val_oversampling': True,
+        'motion_features': ['Lacc_x', 'Lacc_y', 'Lacc_z',
+                            'Gyr_x', 'Gyr_y', 'Gyr_z',
+                            'Mag_x', 'Mag_y', 'Mag_z',
+                            'Bar'],
+        'in_bags': False,
+        'get_position': False,
+        'motion_form': 'temporal',
+        'combine_sensors': 'concat',
+        'motion_augmentations': None,
+        'batch_size': 100,
+        'random': True
+    },
+    'train_args': {
+        'epochs': 100,
+        'learning_rate': 0.0001,
+        'motorized': False,
+        'exclude_modes': ['undefined']
+    }
+}
+
+Ito_parameters = {
+    'extract_args': {
+        'signals': ['Acc', 'Gyr']
+    },
+    'resample_args': {
+        'old_motion_fs': 100,
+        'new_motion_fs': 5,
+        'mot_sampling_method': 'decimate',
+    },
+    'modify_args': {
+        'mot_smoother': None,
+        'mot_smoother_window': 0,
+        'mot_filter': None,
+        'mot_filter_window': 0,
+        'mot_rescaler': None,
+        'mot_virtual_signals': ['acc_normXYZ']
+    },
+    'segment_args': {
+        'mot_length': 300,
+        'mot_stride': 300,
+
+        'mot_bag_size': 1,
+        'mot_bag_step': 0
+    },
+    'build_args': {
+        'test_bag_position': 'same',
+        'test_oversampling': True,
+        'train_bag_position': 'same',
+        'train_oversampling': True,
+        'val_bag_position': 'same',
+        'val_oversampling': True,
+        'motion_features': ['acc_normXYZ', 'Gyr_y'],
+        'in_bags': False,
+        'get_position': False,
+        'motion_form': 'spectrogram',
+        'combine_sensors': 'concat_freq',
+        'motion_augmentations': None,
+        'f_interpolation': 'log',
+        'log_power': True,
+        'spectro_window': 5,
+        'spectro_overlap': 4.9,
+        'spectro_augmentations': [],
+        'batch_size': 32,
+        'random': True
+    },
+    'train_args': {
+        'epochs': 80,
+        'learning_rate': 0.0001,
         'motorized': False,
         'exclude_modes': ['undefined']
     }
@@ -266,3 +374,5 @@ SHL_complete_params = {
         'val_oversampling': True,
     }
 }
+
+

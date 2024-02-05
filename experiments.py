@@ -1,25 +1,30 @@
-import copy
+import numpy as np
 import pandas as pd
 import ruamel.yaml
 import os
 import time
 import gc
 
-from parameters import TMD_MIL_parameters, Liang_parameters, Tang_parameters, SHL_complete_params, SHL_preview_params, Wang_parameters
+from parameters import (TMD_MIL_parameters, Liang_parameters,
+                        Tang_parameters, SHL_complete_params,
+                        SHL_preview_params, Ito_parameters)
 from build import Builder
 from config_parser import config_edit
 import TMD_MIL_training
 import Liang_training
 import Tang_training
-import Wang_training
+import Ito_training
+import matplotlib.pyplot as plt
+from sklearn.metrics import roc_curve, auc
 
 REGENERATE = False
 SPLIT = 'loso'
 DATASET = 'SHL-preview'
 EXP_TYPE = 'all_positions'
-REPEATS = 15
+REPEATS = 3
 scores_df = pd.DataFrame()
 POSITIONS = ['same']
+USERS = [1, 2, 3]
 
 
 def config_save(file):
@@ -69,31 +74,43 @@ def get_scores(scores, test_user=None, postprocessing=False):
     global scores_df
 
     if not postprocessing:
-        acc, f1, _, _, cm = scores
+        acc, f1, pr, rec, _, _, _, _, cm = scores
         if test_user is None:
             score_dict = {'test_user': str(0),
-                           'accuracy': acc,
-                           'f1_score': f1}
+                          'accuracy': acc,
+                          'f1_score': f1,
+                          'precision': pr,
+                          'recall': rec}
         else:
             score_dict = {'test_user': str(test_user),
-                           'accuracy': acc,
-                           'f1_score': f1}
+                          'accuracy': acc,
+                          'f1_score': f1,
+                          'precision': pr,
+                          'recall': rec}
 
     else:
-        acc, f1, post_acc, post_f1, cm = scores
+        acc, f1,  pr, rec, post_acc, post_f1, post_pr, post_rec, cm = scores
         if test_user is None:
             score_dict = {'test_user': str(0),
-                           'accuracy': acc,
-                           'f1_score': f1,
-                           'post_accuracy': post_acc,
-                           'post_f1_score': post_f1}
+                          'accuracy': acc,
+                          'f1_score': f1,
+                          'precision': pr,
+                          'recall': rec,
+                          'post_accuracy': post_acc,
+                          'post_f1_score': post_f1,
+                          'post_precision': post_pr,
+                          'post_recall': post_rec}
 
         else:
             score_dict = {'test_user': str(test_user),
-                           'accuracy': acc,
-                           'f1_score': f1,
-                           'post_accuracy': post_acc,
-                           'post_f1_score': post_f1}
+                          'accuracy': acc,
+                          'f1_score': f1,
+                          'precision': pr,
+                          'recall': rec,
+                          'post_accuracy': post_acc,
+                          'post_f1_score': post_f1,
+                          'post_precision': post_pr,
+                          'post_recall': post_rec}
 
     scores_df = pd.concat([scores_df, pd.DataFrame([score_dict])], ignore_index=True)
     print(scores_df)
@@ -109,15 +126,18 @@ def reset_tensorflow_keras_backend():
 
 def TMD_MIL_experiment(path, regenerate=False):
     data = Builder(regenerate)
-    _, _, scores = TMD_MIL_training.train(data, summary=True, verbose=True, load=False, path=path, eval=True, use_HMM=True)
+    _, _, scores, y, y_ = TMD_MIL_training.train(data, summary=True, verbose=True,
+                                                 load=False, path=path,
+                                                 eval=True, use_HMM=False)
     del data
 
-    return scores
+    return scores, y, y_
 
 
 def Liang_experiment(path, regenerate=False):
     data = Builder(regenerate)
-    _, _, scores = Liang_training.train(data, summary=True, verbose=True, load=False, path=path, eval=True, use_HMM=True)
+    _, _, scores = Liang_training.train(data, summary=True, verbose=True, load=False, path=path, eval=True,
+                                        use_HMM=True)
     del data
 
     return scores
@@ -125,15 +145,16 @@ def Liang_experiment(path, regenerate=False):
 
 def Tang_experiment(path, regenerate=False):
     data = Builder(regenerate)
-    _, _, scores = Tang_training.train(data, summary=False, verbose=True, load=False, path=path, eval=True, use_HMM=True)
+    _, _, scores = Tang_training.train(data, summary=False, verbose=True, load=False, path=path, eval=True,
+                                       use_HMM=True)
     del data
 
     return scores
 
 
-def Wang_experiment(path, regenerate=False):
+def Ito_experiment(path, regenerate=False):
     data = Builder(regenerate)
-    _, _, scores = Wang_training.train(data, summary=True, verbose=True, load=False, path=path, eval=True, use_HMM=True)
+    _, _, scores = Ito_training.train(data, summary=True, verbose=True, load=False, path=path, eval=True, use_HMM=True)
     del data
 
     return scores
@@ -163,8 +184,12 @@ def TMD_MIL(archive_path):
     regenerate = REGENERATE
     split = SPLIT
     exp_type = EXP_TYPE
+    users = USERS
 
     config_edit('build_args', 'train_test_split', split)
+
+    Y = None
+    Y_ = None
 
     if exp_type == 'all_positions':
         for position in POSITIONS:
@@ -176,12 +201,19 @@ def TMD_MIL(archive_path):
             saves_path = os.path.join(archive, position)
 
             if split == 'loso':
-                for test_user in [3]:
+                for test_user in users:
                     print('TEST USER: ' + str(test_user))
                     config_edit('build_args', 'train_test_hold_out', test_user)
                     for turn in range(repeats):
                         path = os.path.join(archive, "turn_" + str(turn), "test_user_" + str(test_user))
-                        scores = TMD_MIL_experiment(path, regenerate)
+                        scores, y, y_ = TMD_MIL_experiment(path, regenerate)
+
+                        # if Y is not None:
+                        #     Y = np.concatenate((Y, y), axis=0)
+                        #     Y_ = np.concatenate((Y_, y_), axis=0)
+                        # else:
+                        #     Y = y
+                        #     Y_ = y_
 
                         get_scores(scores, test_user, True)
                         save(saves_path)
@@ -227,6 +259,59 @@ def TMD_MIL(archive_path):
                     get_scores(scores, postprocessing=True)
                     save(saves_path)
                     regenerate = False
+
+    # show_roc = False
+    # if show_roc:
+    #     fpr = dict()
+    #     tpr = dict()
+    #     roc_auc = dict()
+    #     lw = 2
+    #
+    #     mode_names = ['still', 'walk',
+    #                   'run', 'bike', 'car',
+    #                   'bus', 'train', 'subway']
+    #     for i in range(8):
+    #         fpr[i], tpr[i], _ = roc_curve(Y[:, i], Y_[:, i])
+    #         roc_auc[i] = auc(fpr[i], tpr[i])
+    #
+    #     fpr_grid = np.linspace(0.0, 1.0, 1000)
+    #
+    #     # Interpolate all ROC curves at these points
+    #     mean_tpr = np.zeros_like(fpr_grid)
+    #
+    #     for i in range(8):
+    #         mean_tpr += np.interp(fpr_grid, fpr[i], tpr[i])  # linear interpolation
+    #
+    #     # Average it and compute AUC
+    #     mean_tpr /= 8
+    #
+    #     fpr["macro"] = fpr_grid
+    #     tpr["macro"] = mean_tpr
+    #     roc_auc["macro"] = auc(fpr["macro"], tpr["macro"])
+    #
+    #     plt.plot(
+    #         fpr["macro"],
+    #         tpr["macro"],
+    #         label=f"macro-average ROC curve (AUC = {roc_auc['macro']:.2f})",
+    #         color="navy",
+    #         linestyle=":",
+    #         linewidth=4,
+    #     )
+    #
+    #     for i in range(8):
+    #         plt.plot(fpr[i], tpr[i], lw=2,
+    #                  label='ROC curve for {0} (area = {1:0.2f})'
+    #                        ''.format(mode_names[i], roc_auc[i]))
+    #
+    #     plt.plot([0, 1], [0, 1], 'k--', lw=lw)
+    #     plt.xlim([-0.05, 1.0])
+    #     plt.ylim([0.0, 1.05])
+    #     plt.xlabel('False Positive Rate')
+    #     plt.ylabel('True Positive Rate')
+    #     plt.title('Receiver operating characteristic for multi-class data')
+    #     plt.legend(loc="lower right")
+    #     plt.savefig("ROC_AUC.pdf", format="pdf", bbox_inches="tight")
+    #     plt.show()
 
     return
 
@@ -437,9 +522,9 @@ def Tang(archive_path):
     return
 
 
-def Wang(archive_path):
+def Ito(archive_path):
     global scores_df
-    params = Wang_parameters
+    params = Ito_parameters
 
     for param_group, group_params in params.items():
         for param_name, param_value in group_params.items():
@@ -479,7 +564,7 @@ def Wang(archive_path):
                     config_edit('build_args', 'train_test_hold_out', test_user)
                     for turn in range(repeats):
                         path = os.path.join(archive, "turn_" + str(turn), "test_user_" + str(test_user))
-                        scores = Wang_experiment(path, regenerate)
+                        scores = Ito_experiment(path, regenerate)
 
                         get_scores(scores, test_user, True)
                         save(saves_path)
@@ -489,7 +574,7 @@ def Wang(archive_path):
                 for turn in range(repeats):
                     path = os.path.join(archive, "turn_" + str(turn))
 
-                    scores = Wang_experiment(path, regenerate)
+                    scores = Ito_experiment(path, regenerate)
 
                     get_scores(scores, postprocessing=True)
                     save(saves_path)
@@ -510,7 +595,7 @@ def Wang(archive_path):
                     config_edit('build_args', 'train_test_hold_out', test_user)
                     for turn in range(repeats):
                         path = os.path.join(archive, "turn_" + str(turn), "test_user_" + str(test_user))
-                        scores = Wang_experiment(path, regenerate)
+                        scores = Ito_experiment(path, regenerate)
 
                         get_scores(scores, test_user, True)
                         save(saves_path)
@@ -520,7 +605,7 @@ def Wang(archive_path):
                 for turn in range(repeats):
                     path = os.path.join(archive, "turn_" + str(turn))
 
-                    scores = Wang_experiment(path, regenerate)
+                    scores = Ito_experiment(path, regenerate)
 
                     get_scores(scores, postprocessing=True)
                     save(saves_path)

@@ -1,14 +1,14 @@
 import shutil
 import os
 from keras.optimizers import Adam
-from keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau, TensorBoard
-from keras.losses import CategoricalCrossentropy
+from keras.callbacks import (ModelCheckpoint, EarlyStopping,
+                             ReduceLROnPlateau, TensorBoard)
+from keras.losses import CategoricalCrossentropy, MeanSquaredError
 from keras.metrics import categorical_accuracy
 from build import Builder
 from config_parser import Parser
-from Liang_utils import get_motion_model
+from Liu_utils import get_motion_model
 from metrics import Metrics
-from typing import Tuple
 from evaluate import evaluate
 
 
@@ -31,7 +31,8 @@ def train(data: Builder, summary=True, verbose=True, load=False, path=None, eval
     if not os.path.exists(log_path):
         os.makedirs(log_path)
     try:
-        shutil.rmtree(log_path)
+        if not load:
+            shutil.rmtree(log_path)
     except OSError as e:
         print("Error: %s - %s." % (e.filename, e.strerror))
 
@@ -44,16 +45,13 @@ def train(data: Builder, summary=True, verbose=True, load=False, path=None, eval
         print("Error: %s - %s." % (e.filename, e.strerror))
 
     train, val, test = data(motion_transfer=True)
-    model = get_motion_model(input_shapes=data.input_shape, n_classes=data.n_modes)
+    print(data.input_shape)
+    model = get_motion_model(input_shapes=data.input_shape)
 
     if summary and verbose:
         print(model.summary())
-        print('__________________________________________________________________________________________________')
-        print(model.get_layer('temporal_encoder').summary())
-        print('__________________________________________________________________________________________________')
-        print(model.get_layer('classifier').summary())
 
-    optimizer = Adam(lr=float(conf.learning_rate))
+    optimizer = Adam(learning_rate=float(conf.learning_rate))
     loss_function = CategoricalCrossentropy()
 
     model.compile(optimizer=optimizer,
@@ -83,11 +81,11 @@ def train(data: Builder, summary=True, verbose=True, load=False, path=None, eval
         early_stopping = EarlyStopping(
             monitor='val_loss',
             min_delta=0,
-            patience=30,
+            patience=15,
             mode='min',
             verbose=verbose)
 
-        val_metrics = Metrics(val, val_steps, 'val', verbose)
+        # val_metrics = Metrics(val, val_steps, 'val', verbose)
 
         callbacks = [
             tensorboard_callback,
@@ -126,20 +124,16 @@ def train(data: Builder, summary=True, verbose=True, load=False, path=None, eval
 
     return data, model_path, scores
 
+
 from config_parser import config_edit
 
-
 if __name__ == '__main__':
-    archive = os.path.join('archive', 'Liang', "save-" + '20240111-164621')
+    archive = os.path.join('../archive', 'Liu', "save-" + '20231221-153032')
 
-    turn = 0
-    test_user = None
+    test_user = 2
 
-    if test_user is not None:
-        path = os.path.join(archive, "turn_" + str(turn), "test_user_" + str(test_user))
-        config_edit('build_args', 'train_test_hold_out', test_user)
-    else:
-        path = os.path.join(archive, "turn_" + str(turn))
+    path = os.path.join(archive, "test_user_" + str(test_user))
+    config_edit('build_args', 'train_test_hold_out', test_user)
 
     data = Builder()
     history = train(data, summary=False, verbose=True, load=True, path=path, eval=True, use_HMM=True)

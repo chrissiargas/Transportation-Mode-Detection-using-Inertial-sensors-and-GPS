@@ -79,7 +79,7 @@ def MLP_Layer(inputs):
 
 def get_motion_model(input_shapes):
 
-    inputs = Input(input_shapes)
+    inputs = Input(input_shapes[0])
     X = inputs
 
     X1 = GFE_Block(X)

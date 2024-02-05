@@ -249,5 +249,3 @@ import pandas as pd
 if __name__ == '__main__':
     A = Resampler(delete_src=False)
     A(load=False)
-
-

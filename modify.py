@@ -261,6 +261,8 @@ class Modifier:
             total_std = np.nanstd(all_signals, axis=0)
             del all_signals
 
+        print(total_mean)
+        print(total_std)
         for sub_id in modified_motion.keys():
             for date in modified_motion[sub_id].keys():
                 for position in modified_motion[sub_id][date].keys():

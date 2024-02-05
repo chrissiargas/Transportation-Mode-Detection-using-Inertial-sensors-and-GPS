@@ -124,9 +124,12 @@ class Segmenter:
         length = self.conf.mot_length
         pivot = self.conf.mot_bag_size // 2
         pivot_instance = x[pivot * stride: pivot * stride + length]
-
         counts = np.bincount(pivot_instance)
-        return np.argmax(counts)
+
+        if np.max(counts) >= length / 2:
+            return np.argmax(counts)
+        else:
+            return 0
 
     def get_labels(self, X: np.ndarray) -> np.ndarray:
         return np.apply_along_axis(lambda x: self.majority_voting(x), axis=1, arr=X)

@@ -10,7 +10,7 @@ from config_parser import Parser
 CLASS_ACTIVATION = 'sigmoid'
 
 
-def get_spectrogram_encoder(input_shapes, L, use_dropout=False):
+def get_spectrogram_encoder(input_shapes, L, use_dropout=False, last_dropout=True):
     initializer = initializers.he_uniform()
 
     input = Input(input_shapes)
@@ -106,7 +106,7 @@ def get_spectrogram_encoder(input_shapes, L, use_dropout=False):
     X = dense(X)
     X = norm(X)
     X = activation(X)
-    if use_dropout:
+    if use_dropout and last_dropout:
         X = dropout(X)
 
     output = X
@@ -146,8 +146,6 @@ def get_MIL_attention(L, D):
 
 
 def get_location_encoder(input_shapes, L):
-    mask_value = -1000000.
-
     initializer = initializers.he_uniform()
     window_shape = input_shapes[0]
     features_shape = input_shapes[1]
@@ -157,12 +155,7 @@ def get_location_encoder(input_shapes, L):
 
     X = window
 
-    # w_masking = Masking(mask_value=mask_value, name='window_masking_layer')
-    # X = w_masking(X)
-
-    X = window
-
-    norm = BatchNormalization(name='location_norm_1', trainable=False)
+    norm = BatchNormalization(name='location_norm_1')
     X = norm(X)
 
     lstm = Bidirectional(LSTM(units=128, name='location_BiLSTM'))
@@ -175,7 +168,7 @@ def get_location_encoder(input_shapes, L):
         kernel_initializer=initializer,
         name='location_dense_1'
     )
-    norm = BatchNormalization(name='location_norm_2', trainable=False)
+    norm = BatchNormalization(name='location_norm_2')
     activation = ReLU()
 
     X = dense(X)
@@ -187,7 +180,7 @@ def get_location_encoder(input_shapes, L):
         kernel_initializer=initializer,
         name='location_dense_2'
     )
-    norm = BatchNormalization(name='location_norm_3', trainable=False)
+    norm = BatchNormalization(name='location_norm_3')
     activation = ReLU()
 
     X = dense(X)
@@ -199,19 +192,13 @@ def get_location_encoder(input_shapes, L):
         kernel_initializer=initializer,
         name='location_dense_3'
     )
-    norm = BatchNormalization(name='location_norm_4', trainable=False)
+    norm = BatchNormalization(name='location_norm_4')
     activation = ReLU()
 
     X = dense(X)
     X = norm(X)
     X = activation(X)
 
-    # mask_w = K.switch(
-    #     tf.reduce_any(tf.equal(features, mask_value), axis=1, keepdims=True),
-    #     lambda: tf.zeros_like(X), lambda: tf.ones_like(X)
-    # )
-
-    # output = tf.multiply(X, mask_w)
     output = X
 
     return Model(inputs=[window, features],
@@ -227,9 +214,9 @@ def get_classifier(L, n_units=8, has_head=False):
         dense = Dense(
             units=L // 2,
             kernel_initializer=initializers.he_uniform(),
-            name = 'head_dense'
+            name='head_dense'
         )
-        norm = BatchNormalization(trainable=False, name='head_norm')
+        norm = BatchNormalization(name='head_norm')
         activation = ReLU()
 
         X = dense(X)
@@ -237,7 +224,7 @@ def get_classifier(L, n_units=8, has_head=False):
         X = activation(X)
 
     dense = Dense(units=n_units,
-                  kernel_initializer=initializers.he_uniform(),
+                  kernel_initializer=initializers.glorot_uniform(),
                   name='final_dense')
 
     X = dense(X)
@@ -265,7 +252,8 @@ def get_MIL_model(input_shapes, dpd_motion_encoder=None, dpd_location_encoder=No
 
     motion_transfer = True if dpd_motion_encoder else False
     motion_encoder = get_spectrogram_encoder(motion_size, conf.L,
-                                             use_dropout=not motion_transfer)
+                                             use_dropout=not motion_transfer,
+                                             last_dropout=False)
 
     if motion_transfer:
         motion_encoder.set_weights(dpd_motion_encoder.get_layer('spectrogram_encoder').get_weights())
@@ -278,10 +266,18 @@ def get_MIL_model(input_shapes, dpd_motion_encoder=None, dpd_location_encoder=No
         location_encoder.set_weights(dpd_location_encoder.get_layer('location_encoder').get_weights())
         location_encoder.trainable = False
 
-    MIL_attention = get_MIL_attention(conf.L, conf.D)
+    if conf.motion_MIL:
+        mot_MIL_attention = get_MIL_attention(conf.L, conf.D)
+        mot_att_softmax = Softmax(name='motion_attention_softmax')
+
+    if conf.fusion == 'MIL':
+        MIL_attention = get_MIL_attention(conf.L, conf.D)
+        att_softmax = Softmax(name='attention_softmax')
 
     n_classes = 5 if conf.motorized else 8
-    classifier = get_classifier(conf.L, n_classes, has_head=True)
+
+    L = 2 * conf.L if conf.fusion == 'concat' else conf.L
+    classifier = get_classifier(L, n_classes, has_head=True)
 
     motion_bags = Input(motion_shape)
     loc_w_bags = Input(loc_w_shape)
@@ -296,18 +292,33 @@ def get_MIL_model(input_shapes, dpd_motion_encoder=None, dpd_location_encoder=No
     motion_encodings = motion_encoder(motion_instances)
     location_encodings = location_encoder([loc_w_instances, loc_fts_instances])
 
-    motion_encodings = tf.reshape(motion_encodings, (batch_size, mot_bag_size, conf.L))
+    if conf.motion_MIL:
+        mot_attention_ws = mot_MIL_attention(motion_encodings)
+        mot_attention_ws = tf.reshape(mot_attention_ws, [batch_size, mot_bag_size])
+
+        attention_ws = tf.expand_dims(mot_att_softmax(mot_attention_ws), -2)
+        motion_encodings = tf.reshape(motion_encodings, [batch_size, mot_bag_size, conf.L])
+
+        motion_encodings = tf.matmul(attention_ws, motion_encodings)
+        mot_bag_size = 1
+    else:
+        motion_encodings = tf.reshape(motion_encodings, (batch_size, mot_bag_size, conf.L))
+
     location_encodings = tf.reshape(location_encodings, (batch_size, loc_bag_size, conf.L))
     encodings = concatenate([motion_encodings, location_encodings], axis=-2)
-    encodings = tf.reshape(encodings, (batch_size * (mot_bag_size + loc_bag_size), conf.L))
 
-    attention_ws = MIL_attention(encodings)
-    attention_ws = tf.reshape(attention_ws, (batch_size, mot_bag_size + loc_bag_size))
-    softmax = Softmax(name = 'attention_softmax')
-    attention_ws = tf.expand_dims(softmax(attention_ws), -2)
-    encodings = tf.reshape(encodings, (batch_size, mot_bag_size + loc_bag_size, conf.L))
-    flatten = Flatten()
-    pooling = flatten(tf.matmul(attention_ws, encodings))
+    if conf.fusion == 'MIL':
+        encodings = tf.reshape(encodings, (batch_size * (mot_bag_size + loc_bag_size), conf.L))
+        attention_ws = MIL_attention(encodings)
+        attention_ws = tf.reshape(attention_ws, (batch_size, mot_bag_size + loc_bag_size))
+
+        attention_ws = tf.expand_dims(att_softmax(attention_ws), -2)
+        encodings = tf.reshape(encodings, (batch_size, mot_bag_size + loc_bag_size, conf.L))
+        flatten = Flatten()
+        pooling = flatten(tf.matmul(attention_ws, encodings))
+
+    elif conf.fusion == 'concat':
+        pooling = tf.reshape(encodings, (batch_size, conf.L * (mot_bag_size + loc_bag_size)))
 
     y_pred = classifier(pooling)
 
@@ -318,10 +329,19 @@ def get_motion_model(input_shapes):
     conf = Parser()
     conf.get_args()
 
-    motion_shape = input_shapes[0]
+    motion_shape = list(input_shapes[0])
     pos_size = input_shapes[1]
 
-    motion_encoder = get_spectrogram_encoder(motion_shape, conf.L, use_dropout=True)
+    if conf.motion_MIL:
+        mot_bag_size = motion_shape[0]
+        motion_size = motion_shape[1:]
+    else:
+        motion_size = motion_shape
+
+    motion_encoder = get_spectrogram_encoder(motion_size, conf.L, use_dropout=True)
+
+    if conf.motion_MIL:
+        MIL_attention = get_MIL_attention(conf.L, conf.D)
 
     n_classes = 5 if conf.motorized else 8
     classifier = get_classifier(conf.L, n_classes, has_head=False)
@@ -329,9 +349,25 @@ def get_motion_model(input_shapes):
     motion_input = Input(motion_shape)
     motion_positions = Input(pos_size, name='positional')
 
-    motion_encodings = motion_encoder(motion_input)
+    if conf.motion_MIL:
+        motion_bags = motion_input
+        batch_size = tf.shape(motion_bags)[0]
+        motion_instances = tf.reshape(motion_bags, (batch_size * mot_bag_size, *motion_size))
 
-    y_pred = classifier(motion_encodings)
+        motion_encodings = motion_encoder(motion_instances)
+        attention_ws = MIL_attention(motion_encodings)
+        attention_ws = tf.reshape(attention_ws, [batch_size, mot_bag_size])
+
+        softmax = Softmax(name='motion_attention_softmax')
+        attention_ws = tf.expand_dims(softmax(attention_ws), -2)
+        motion_encodings = tf.reshape(motion_encodings, [batch_size, mot_bag_size, conf.L])
+
+        motion_pooling = tf.squeeze(tf.matmul(attention_ws, motion_encodings), axis=-2)
+
+    else:
+        motion_pooling = motion_encoder(motion_input)
+
+    y_pred = classifier(motion_pooling)
 
     return Model([motion_input, motion_positions], y_pred)
 
@@ -356,8 +392,3 @@ def get_location_model(input_shapes):
     y_pred = classifier(location_encodings)
 
     return Model([loc_window, loc_features], y_pred)
-
-
-
-
-

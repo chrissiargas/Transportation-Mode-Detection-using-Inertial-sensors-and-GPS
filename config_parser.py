@@ -7,13 +7,15 @@ import ruamel.yaml
 
 class Parser:
     def __init__(self):
+        self.fusion = None
+        self.motion_MIL = None
         self.seq_thres = None
         self.separated_channels = None
         self.exclude_modes = None
         self.get_position = None
         self.motorized = None
-        self.location_transfer = None
-        self.motion_transfer = None
+        self.location_encoder = None
+        self.motion_encoder = None
         self.learning_rate = None
         self.location_epochs = None
         self.motion_epochs = None
@@ -225,12 +227,14 @@ class Parser:
 
         self.L = args.train_args['L']
         self.D = args.train_args['D']
+        self.motion_MIL = args.train_args['motion_MIL']
+        self.fusion = args.train_args['fusion']
         self.epochs = args.train_args['epochs']
         self.motion_epochs = args.train_args['motion_epochs']
         self.location_epochs = args.train_args['location_epochs']
         self.learning_rate = args.train_args['learning_rate']
-        self.motion_transfer = args.train_args['motion_transfer']
-        self.location_transfer = args.train_args['location_transfer']
+        self.motion_encoder = args.train_args['motion_encoder']
+        self.location_encoder = args.train_args['location_encoder']
         self.motorized = args.train_args['motorized']
         self.exclude_modes = args.train_args['exclude_modes']
         

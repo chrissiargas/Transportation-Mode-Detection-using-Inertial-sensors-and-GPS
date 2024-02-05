@@ -156,6 +156,7 @@ class spectro_transformer:
         self.height, self.width = 48, 48
         self.out_size = (self.height, self.width)
         self.channels = None
+        self.concat_height = None
 
         self.nperseg = self.conf.spectro_window * self.conf.motion_fs
         self.noverlap = self.conf.spectro_overlap * self.conf.motion_fs
@@ -171,6 +172,16 @@ class spectro_transformer:
                 return [(self.bag_size, self.height, self.width, self.channels)]
             else:
                 return [(self.height, self.width, self.channels)]
+
+        if self.conf.combine_sensors == 'concat_freq':
+            in_features = [feature for feature in self.conf.motion_features if feature in self.mot_features]
+            self.channels = len(in_features)
+            self.concat_height = self.height * self.channels
+
+            if self.conf.in_bags:
+                return [(self.bag_size, self.concat_height, self.width, 1)]
+            else:
+                return [(self.concat_height, self.width, 1)]
 
         if self.conf.combine_sensors == 'separate':
             self.n_channels = len(self.conf.separated_channels)
@@ -237,11 +248,15 @@ class spectro_transformer:
             outputs = np.zeros((len(instances), self.height, self.width, self.channels))
             channel = 0
 
+        elif self.conf.combine_sensors == 'concat_freq':
+            outputs = np.zeros((len(instances), self.concat_height, self.width, 1))
+            channel = 0
+
         elif self.conf.combine_sensors == 'separate':
             channel_outputs = [np.zeros((len(instances), self.width, self.height, self.channel_signals[k]))
                                for k in range(self.n_channels)]
 
-        if training:
+        if training and len(self.conf.spectro_augmentations):
             mask = get_mask(self.conf.spectro_augmentations, self.out_size)
         else:
             mask = None
@@ -256,6 +271,17 @@ class spectro_transformer:
                 outputs[..., channel] = spectro
                 channel += 1
 
+        if self.conf.combine_sensors == 'concat_freq':
+            for feature in instances.keys():
+                signal = instances[feature]
+                spectro = self.get_spectrogram(signal, mask)
+
+                spectro_start = channel * self.height
+                spectro_end = (channel + 1) * self.height
+
+                outputs[:, spectro_start: spectro_end, :, 0] = spectro
+                channel += 1
+
         if self.conf.combine_sensors == 'separate':
             for k, channel_features in enumerate(self.conf.separated_channels):
                 for f, feature in enumerate(channel_features):
@@ -265,7 +291,7 @@ class spectro_transformer:
 
                         channel_outputs[k][..., f] = spectro
 
-        if self.conf.combine_sensors == 'concat':
+        if self.conf.combine_sensors == 'concat' or self.conf.combine_sensors == 'concat_freq':
             if not self.conf.in_bags:
                 outputs = outputs[0]
 

@@ -37,7 +37,8 @@ def motion_train(data: Builder, summary=True, verbose=True, load=False, path=Non
     if not os.path.isdir(model_dir):
         os.makedirs(model_dir)
     try:
-        os.remove(model_path)
+        if not load:
+            os.remove(model_path)
     except OSError as e:
         print("Error: %s - %s." % (e.filename, e.strerror))
 
@@ -116,22 +117,27 @@ def motion_train(data: Builder, summary=True, verbose=True, load=False, path=Non
         model.load_weights(model_path)
 
     test_steps = data.test_size // conf.batch_size
+
     test_metrics = Metrics(test, test_steps, 'test', verbose)
     model.evaluate(test, steps=test_steps, callbacks=[test_metrics])
 
     if eval:
-        accuracy, f1, post_accuracy, post_f1, cm_df = evaluate(data, model, use_HMM)
+        (accuracy, f1, precision, recall,
+         post_accuracy, post_f1, post_precision, post_recall,
+         cm_df, y, y_) = evaluate(data, model, motion_only=True, use_HMM=use_HMM, softmax=True)
 
     else:
-        accuracy, f1, post_accuracy, post_f1, cm_df = 0., 0., 0., 0., 0.
+        (accuracy, f1, precision, recall,
+         post_accuracy, post_f1, post_precision, post_recall,
+         cm_df, y, y_) = 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.
 
-    scores = [accuracy, f1, post_accuracy, post_f1, cm_df]
+    scores = [accuracy, f1, precision, recall, post_accuracy, post_f1, post_precision, post_recall, cm_df]
 
     del train
     del val
     del test
 
-    return data, model_path, scores
+    return data, model_path, scores, y, y_
 
 
 def location_train(data: Builder, summary=True, verbose=True, load=False, path=None, eval=False, use_HMM=False):
@@ -258,30 +264,39 @@ def train(data: Builder, summary=True, verbose=True, load=False, path=None, eval
     conf.get_args()
 
     motion_encoder = None
-    if conf.motion_transfer == 'train' or conf.motion_transfer == 'load':
-        config_edit('build_args', 'in_bags', False)
+    if conf.motion_encoder == 'transfer' or conf.motion_encoder == 'train':
         config_edit('build_args', 'train_oversampling', True)
 
-        data, weights_file, scores = motion_train(data=data,
-                                                  summary=summary,
-                                                  verbose=verbose,
-                                                  load=(conf.motion_transfer == 'load'),
-                                                  path=path,
-                                                  eval=False,
-                                                  use_HMM=False)
+        only_motion = (conf.motion_encoder == 'train')
+        transfer_motion = (conf.motion_encoder == 'transfer')
+        eval = eval and only_motion
+        use_HMM = use_HMM and only_motion
+
+        if transfer_motion:
+            config_edit('build_args', 'in_bags', False)
+
+        data, weights_file, scores, y, y_ = motion_train(data=data,
+                                                         summary=summary,
+                                                         verbose=verbose,
+                                                         load=load,
+                                                         path=path,
+                                                         eval=eval,
+                                                         use_HMM=use_HMM)
+
+        if only_motion:
+            return data, weights_file, scores, y, y_
 
         motion_encoder = get_motion_model(data.input_shape)
         motion_encoder.load_weights(weights_file)
 
         config_edit('build_args', 'in_bags', True)
-        config_edit('build_args', 'train_oversampling', False)
 
     location_encoder = None
-    if conf.location_transfer == 'train' or conf.motion_transfer == 'load':
+    if conf.location_encoder == 'train' or conf.motion_encoder == 'load':
         data, weights_file, accuracy, f1_score, conf = location_train(data=data,
                                                                       summary=summary,
                                                                       verbose=verbose,
-                                                                      load=(conf.motion_transfer == 'load'),
+                                                                      load=(conf.motion_encoder == 'load'),
                                                                       path=path,
                                                                       eval=False,
                                                                       use_HMM=False)
@@ -289,6 +304,7 @@ def train(data: Builder, summary=True, verbose=True, load=False, path=None, eval
         location_encoder = get_location_model(data.input_shape)
         location_encoder.load_weights(weights_file)
 
+    config_edit('build_args', 'train_oversampling', True)
     conf = Parser()
     conf.get_args()
 
@@ -396,23 +412,27 @@ def train(data: Builder, summary=True, verbose=True, load=False, path=None, eval
     model.evaluate(test, steps=test_steps, callbacks=[test_metrics])
 
     if eval:
-        accuracy, f1, post_accuracy, post_f1, cm_df = evaluate(data, model, motion_only=False, use_HMM=use_HMM)
+        (accuracy, f1, precision, recall,
+         post_accuracy, post_f1, post_precision, post_recall,
+         cm_df, y, y_) = evaluate(data, model, motion_only=False, use_HMM=use_HMM, softmax=True)
 
     else:
-        accuracy, f1, post_accuracy, post_f1, cm_df = 0., 0., 0., 0., 0.
+        (accuracy, f1, precision, recall,
+         post_accuracy, post_f1, post_precision, post_recall,
+         cm_df) = 0., 0., 0., 0., 0., 0., 0., 0., 0.
 
-    scores = [accuracy, f1, post_accuracy, post_f1, cm_df]
+    scores = [accuracy, f1, precision, recall, post_accuracy, post_f1, post_precision, post_recall, cm_df]
 
     del train
     del val
     del test
 
-    return data, model_path, scores
+    return data, model_path, scores, y, y_
 
 
 if __name__ == '__main__':
-    archive = os.path.join('archive', 'TMD_MIL', "save-" + '20240104-211306')
-    turn = 0
+    archive = os.path.join('archive', 'TMD_MIL', "save-" + '20240123-142732')
+    turn = 3
     test_user = 1
 
     path = os.path.join(archive, "turn_" + str(turn), "test_user_" + str(test_user))

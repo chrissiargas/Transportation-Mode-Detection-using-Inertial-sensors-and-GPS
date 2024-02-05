@@ -86,9 +86,3 @@ def get_motion_model(input_shapes, n_classes=8):
     y_pred = classifier(motion_encodings)
 
     return Model(motion_input, y_pred)
-
-
-
-
-
-

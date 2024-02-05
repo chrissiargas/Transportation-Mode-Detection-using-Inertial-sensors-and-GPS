@@ -144,8 +144,11 @@ def get_YY_seq(data: Builder, model: Model, motion_only=False, train=False, test
     return true_sequenced, pred_sequenced, lens
 
 
-def get_YY_(data: Builder, model: Model, motion_only: bool = False, pred: bool = False):
-    model.get_layer('classifier').get_layer('class_activation').activation = Softmax()
+def get_YY_(data: Builder, model: Model, motion_only: bool = False,
+            pred: bool = False, softmax: bool = False):
+
+    if softmax:
+        model.get_layer('classifier').get_layer('class_activation').activation = Softmax()
 
     if pred:
         train = False
